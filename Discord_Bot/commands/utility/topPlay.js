@@ -47,5 +47,5 @@ module.exports = {
         // Call the fetchData function to retrieve data
         const data = await fetchData();
 		await interaction.reply(JSON.stringify(data));
-	},
+	}
 };
