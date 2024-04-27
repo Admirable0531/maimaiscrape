@@ -26,10 +26,14 @@ module.exports = {
         
         const uri = 'mongodb://localhost:27017';
         const dbName = 'mydatabase';
-        const collectionName = 'ryan_top';
+        const users = ["ryan", "jiayi", "marcus", "kok", "yuan", "keyang"]
         const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+        
+        for (const auser in users) {
+            const data = await fetchData(users[auser]);
+        }
 
-        async function fetchData() {
+        async function fetchData(user) {
             try {
                 // Connect to the MongoDB server
                 await client.connect();
@@ -38,6 +42,8 @@ module.exports = {
                 const db = client.db(dbName);
 
                 // Access the collection
+                const collectionName = `${user}_top`;
+                console.log(collectionName)
                 const collection = db.collection(collectionName);
 
                 // Query the collection and retrieve data
@@ -45,53 +51,105 @@ module.exports = {
 
                 // Iterate over the cursor to access each document
                 const documents = await cursor.toArray();
-                const topSongsRecent = documents[0].new;
-                const topSongsOld = documents[1].new;
-                console.log(JSON.stringify(topSongsRecent));
-                console.log(JSON.stringify(topSongsOld));
-                compareSongs(JSON.stringify(topSongsRecent), JSON.stringify(topSongsOld))
+                const topSongsRecent = documents[0];
+                const topSongsOld = documents[1];
+                compareSongs(JSON.stringify(topSongsRecent), JSON.stringify(topSongsOld), user)
                 // return topSongs;
             } catch (error) {
                 console.error('Error:', error);
-            } finally {
-                // Close the connection
-                await client.close();
             }
         }
 
-        // Call the fetchData function to retrieve data
-        const data = await fetchData();
-
-        function compareSongs(file1, file2) {
+        async function compareSongs(file1, file2, user) {
+            let new_records=[];
             // Load JSON files
             const data1 = JSON.parse(file1);
             const data2 = JSON.parse(file2);
+            console.log(data1);
+
+            const rating1 = data1.rating;
+            const rating2 = data2.rating;
+
+            console.log(rating2);
+
+            rating_diff = rating1 - rating2;
+            const prefix = rating_diff >= 0 ? '+' : '-';
+            const rating_diff_str = "(" + prefix + Math.abs(rating_diff).toString() + "rt)";
         
             // Extract song names
-            const songsInFile1 = new Set(data1.map(song => song.Song));
-            const songsInFile2 = new Set(data2.map(song => song.Song));
-        
-            // Find common songs
-            const commonSongs = new Set([...songsInFile1].filter(song => songsInFile2.has(song)));
+            const songsInFile1New = new Set(data1.new.map(song => song.Song));
+            const songsInFile2New = new Set(data2.new.map(song => song.Song));
+
+            const songsInFile1Old = new Set(data1.old.map(song => song.Song));
+            const songsInFile2Old = new Set(data2.old.map(song => song.Song));
         
             // Songs present in file1 but missing in file2
-            const missingInFile2 = [...songsInFile1].filter(song => !songsInFile2.has(song));
+            const missingInFile2New = [...songsInFile1New].filter(song => !songsInFile2New.has(song));
+            const missingInFile2Old = [...songsInFile1Old].filter(song => !songsInFile2Old.has(song));
         
             // Print songs present in file1 but missing in file2
-            if (missingInFile2.length > 0) {
+            if (missingInFile2New.length > 0) {
                 console.log("Songs present in file1 but missing in file2:");
-                missingInFile2.forEach(song => {
-                    const matchingData = data1.find(data => data.Song === song);
+                missingInFile2New.forEach( song => {
+                    const matchingData = data1.new.find(data => data.Song === song);
                     console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
-                    const newEmbed = new EmbedBuilder()
-                        .setColor(0x0099FF)
-                        .setAuthor({ name: yesterdayDate + " -> " + todayDate, iconURL: 'https://maimai.sega.jp/storage/area/region/universe/icon/03.png'})
-        
-                    channel.send({ embeds: [newEmbed] });
-                });
+                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | ${song} (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | NEW`);
+                    });
             } else {
                 console.log("All songs in file1 are also present in file2.");
             }
+
+            if (missingInFile2Old.length > 0) {
+                console.log("Songs present in file1 but missing in file2:");
+                missingInFile2Old.forEach( song => {
+                    const matchingData = data1.old.find(data => data.Song === song);
+                    console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
+                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | ${song} (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | OLD`);
+                    });
+            } else {
+                console.log("All songs in file1 are also present in file2.");
+            }
+            if(new_records == []){
+
+            } else {
+                const [user_img_src, user_name, user_rating] = await getUserInfo(user);
+                const newEmbed = new EmbedBuilder()
+                    .setColor(0x7289da)
+                    .setAuthor({ name: user_name + " " + user_rating + "rt " + rating_diff_str, iconURL: user_img_src})
+                new_records.forEach(score => {
+                    newEmbed.addFields({name: ' ', value: score},);
+                });
+                channel.send({ embeds: [newEmbed] });
+            }
         }
+
+        async function getUserInfo(user) {
+            try {
+                // Connect to the MongoDB server
+                await client.connect();
+
+                // Access the database
+                const db = client.db(dbName);
+
+                // Access the collection
+                const collection = db.collection("user_info");
+
+                // Query the collection and retrieve data
+                const cursor = collection.find({ user: user }).sort({ _id: -1 }).limit(1);
+                const documents = await cursor.toArray();
+                const document = documents[0];
+
+                const img_src = document.img_src;
+                const name = document.name;
+                const rating = document.rating;
+                
+                return [img_src, name, rating]
+                // return topSongs;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        // Call the fetchData function to retrieve data
     }
 }

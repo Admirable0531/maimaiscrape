@@ -13,6 +13,7 @@ import json
 from urllib.parse import urlparse, parse_qs, urlencode
 import datetime
 import sys
+from pymongo import MongoClient
 
 
 # Load variables from .env file
@@ -69,8 +70,30 @@ try:
         driver.execute_script(script)
     except Exception as e:
         print(e)
-    
-    def get_old_score():
+
+    def get_top_score():
+        new_rating_elements = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
+        
+        if len(new_rating_elements) >= 2:
+            first_element = new_rating_elements[0]
+        new_rating = first_element.get_attribute('outerHTML')
+        
+        soup = BeautifulSoup(new_rating, 'html.parser')
+        new_records=[]
+        
+        
+        for row in soup.find_all('tr', class_='scoreRecordRow')[1:]:
+            new_record = {}
+            cells = row.find_all('td')
+            new_record['#'] = cells[0].text.strip()
+            new_record['Song'] = cells[1].text.strip()
+            new_record['Chart'] = cells[2].text.strip()
+            new_record['Level'] = cells[3].text.strip()
+            new_record['Achv'] = cells[4].text.strip()
+            new_record['Rank'] = cells[5].text.strip()
+            new_record['Rating'] = cells[6].text.strip()
+            new_records.append(new_record)
+
         old_rating_elements = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
         
         if len(old_rating_elements) >= 2:
@@ -79,75 +102,85 @@ try:
         old_rating = second_element.get_attribute('outerHTML')
         
         soup = BeautifulSoup(old_rating, 'html.parser')
-        records=[]
+        old_records=[]
         
         
         for row in soup.find_all('tr', class_='scoreRecordRow')[1:]:
-            record = {}
+            old_record = {}
             cells = row.find_all('td')
-            record['#'] = cells[0].text.strip()
-            record['Song'] = cells[1].text.strip()
-            record['Chart'] = cells[2].text.strip()
-            record['Level'] = cells[3].text.strip()
-            record['Achv'] = cells[4].text.strip()
-            record['Rank'] = cells[5].text.strip()
-            record['Rating'] = cells[6].text.strip()
-            records.append(record)
+            old_record['#'] = cells[0].text.strip()
+            old_record['Song'] = cells[1].text.strip()
+            old_record['Chart'] = cells[2].text.strip()
+            old_record['Level'] = cells[3].text.strip()
+            old_record['Achv'] = cells[4].text.strip()
+            old_record['Rank'] = cells[5].text.strip()
+            old_record['Rating'] = cells[6].text.strip()
+            old_records.append(old_record)
+        
+        rating = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.totalRating')))
+        text = rating.text
 
-        current_datetime = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        for item in records:
-            print("No: " + item['#'] + " Name: " + item['Song'] + " Diff: " + item['Chart'] + " Level: " + item['Level'] + " Achievement: " + item['Achv'] + " Rank: " + item['Rank'] + " Rating: " + item['Rating'])
-        records.append({'Date': current_datetime})
+        rating = int(text.split("：")[1])
+
+        data = {
+            "new": new_records,
+            "old": old_records,
+            "rating": rating,
+            "Date": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        }
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
+        return data
+        
 
-        data_encoded = json.dumps(records, ensure_ascii=False, indent=4)
-        with open('new.json', 'w', encoding='utf-8') as f:
-            f.write(data_encoded)
-        # print(json_data)
+    
+    CONNECTION_STRING = "mongodb://localhost:27017/"
+    client = MongoClient(CONNECTION_STRING)
+    db = client["mydatabase"]
+    current_date = datetime.date.today()
 
-    def get_new_score():
-        new_rating_elements = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
-        
-        if len(new_rating_elements) >= 2:
-            first_element = new_rating_elements[0]
-        new_rating = first_element.get_attribute('outerHTML')
-        
-        soup = BeautifulSoup(new_rating, 'html.parser')
-        records=[]
-        
-        
-        for row in soup.find_all('tr', class_='scoreRecordRow')[1:]:
-            record = {}
-            cells = row.find_all('td')
-            record['#'] = cells[0].text.strip()
-            record['Song'] = cells[1].text.strip()
-            record['Chart'] = cells[2].text.strip()
-            record['Level'] = cells[3].text.strip()
-            record['Achv'] = cells[4].text.strip()
-            record['Rank'] = cells[5].text.strip()
-            record['Rating'] = cells[6].text.strip()
-            records.append(record)
+    # Format the date as a string in the desired format
+    formatted_date = current_date.strftime("%d/%m/%Y")
 
-        current_datetime = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        for item in records:
-            print("No: " + item['#'] + " Name: " + item['Song'] + " Diff: " + item['Chart'] + " Level: " + item['Level'] + " Achievement: " + item['Achv'] + " Rank: " + item['Rank'] + " Rating: " + item['Rating'])
-        records.append({'Date': current_datetime})
-
-        data_encoded = json.dumps(records, ensure_ascii=False, indent=4)
-        with open('new.json', 'w', encoding='utf-8') as f:
-            f.write(data_encoded)
+    def get_ryan_info():
+        user_img_element = WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, ".w_112.f_l"))
+        )
+        user_img_src = user_img_element.get_attribute("src")
         
-        # print(json_data)
+        user_name_element = WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, ".name_block.f_l.f_16"))
+        )
+        user_name = user_name_element.text
+
+        user_rating_element = WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, ".rating_block"))
+        )
+        user_rating = user_rating_element.text
+
+        ryan_user_data = {
+            "user": "ryan",
+            "img_src": user_img_src,
+            "name": user_name,
+            "rating": user_rating,
+            "date": formatted_date
+        }
+        
+        collection = db["user_info"]
+        collection.insert_one(ryan_user_data)
+
 
 # Ryan
+    get_ryan_info()
     analyze_rating_link = WebDriverWait(driver, 10).until(
         EC.visibility_of_element_located((By.LINK_TEXT, "Analyze Rating"))
     )
     analyze_rating_link.click()
+    
     driver.switch_to.window(driver.window_handles[1])
-    get_new_score()
-
+    
+    collection = db["ryan_top"]
+    collection.insert_one(get_top_score())
     
     driver.get('https://maimaidx-eng.com/maimai-mobile/friend/')
 
@@ -165,13 +198,56 @@ try:
     except Exception as e:
         print(e)
 
-# # Jiayi
-#     analyze_rating_link = WebDriverWait(driver, 10).until(
-#         EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8067013466678&playerName=%E2%99%AA"]'))
-#     )
-#     analyze_rating_link.click()
-#     driver.switch_to.window(driver.window_handles[1])
-#     get_old_score()
+    def get_user_info():
+        user_img_elements = WebDriverWait(driver, 10).until(
+            EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".w_112.f_l"))
+        )
+        user_img_src = [element.get_attribute("src") for element in user_img_elements]
+        
+        user_name_elements = WebDriverWait(driver, 10).until(
+            EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".name_block.t_l.f_l.f_16.underline"))
+        )
+        user_name = [element.text for element in user_name_elements]
+
+        user_rating_elements = WebDriverWait(driver, 10).until(
+            EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".rating_block"))
+        )
+        user_rating = [element.text for element in user_rating_elements]
+
+        for i in range(1, 6):
+            if i == 1:
+                choose = "jiayi"
+            elif i == 2:
+                choose = "marcus"
+            elif i == 3:
+                choose = "kok"
+            elif i == 4:
+                choose = "yuan"
+            elif i == 5:
+                choose = "keyang"
+            else:
+                print("error user")
+            user_data = {
+                "user": choose,
+                "img_src": user_img_src[i],
+                "name": user_name[i],
+                "rating": user_rating[i],
+                "date": formatted_date
+            }
+            collection = db["user_info"]
+            collection.insert_one(user_data)
+
+    get_user_info()
+
+# Jiayi
+    analyze_rating_link = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8067013466678&playerName=%E2%99%AA"]'))
+    )
+    analyze_rating_link.click()
+    driver.switch_to.window(driver.window_handles[1])
+    
+    collection = db["jiayi_top"]
+    collection.insert_one(get_top_score())
 
 
 # Markus
@@ -180,35 +256,40 @@ try:
     )
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
-    get_new_score()
+    collection = db["marcus_top"]
+    collection.insert_one(get_top_score())
 
 
-# # Kok
-#     analyze_rating_link = WebDriverWait(driver, 10).until(
-#         EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8085423055111&playerName=%EF%BC%A9%EF%BC%AE%EF%BC%A6%EF%BC%A9%EF%BC%AE%EF%BC%A9%EF%BC%B4%EF%BC%B9"]'))
-#     )
-#     analyze_rating_link.click()
-#     driver.switch_to.window(driver.window_handles[1])
-#     get_old_score()
+# Kok
+    analyze_rating_link = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8085423055111&playerName=%EF%BC%A9%EF%BC%AE%EF%BC%A6%EF%BC%A9%EF%BC%AE%EF%BC%A9%EF%BC%B4%EF%BC%B9"]'))
+    )
+    analyze_rating_link.click()
+    driver.switch_to.window(driver.window_handles[1])
+    collection = db["kok_top"]
+    collection.insert_one(get_top_score())
 
 
-# # Yuan
-#     analyze_rating_link = WebDriverWait(driver, 10).until(
-#         EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8070962675681&playerName=%EF%BD%99%EF%BD%95%EF%BD%81%EF%BD%8E%E3%80%80%EF%BC%AF%D0%94%EF%BC%AF"]'))
-#     )
-#     analyze_rating_link.click()
-#     driver.switch_to.window(driver.window_handles[1])
-#     get_old_score()
+# Yuan
+    analyze_rating_link = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8070962675681&playerName=%EF%BD%99%EF%BD%95%EF%BD%81%EF%BD%8E%E3%80%80%EF%BC%AF%D0%94%EF%BC%AF"]'))
+    )
+    analyze_rating_link.click()
+    driver.switch_to.window(driver.window_handles[1])
+    collection = db["yuan_top"]
+    collection.insert_one(get_top_score())
 
 
-# # Keyang
-#     analyze_rating_link = WebDriverWait(driver, 10).until(
-#         EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8091021494559&playerName=%EF%BD%84%EF%BC%88%EF%BC%9A%EF%BC%93%EF%BC%89%EF%BC%8F%EF%BD%84%EF%BD%98"]'))
-#     )
-#     analyze_rating_link.click()
-#     driver.switch_to.window(driver.window_handles[1])
-#     get_old_score()
+# Keyang
+    analyze_rating_link = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8091021494559&playerName=%EF%BD%84%EF%BC%88%EF%BC%9A%EF%BC%93%EF%BC%89%EF%BC%8F%EF%BD%84%EF%BD%98"]'))
+    )
+    analyze_rating_link.click()
+    driver.switch_to.window(driver.window_handles[1])
+    collection = db["keyang_top"]
+    collection.insert_one(get_top_score())
 
+    driver.close()
 
 
 except Exception as e:
