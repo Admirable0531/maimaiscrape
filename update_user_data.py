@@ -27,11 +27,14 @@ def update():
     url = "https://maimaidx-eng.com"
 
     try:
-        options = webdriver.ChromeOptions()
-        options.add_experimental_option("detach", True)
-        options.add_argument("--enable-logging=stderr")
-        options.add_argument('--log-level=3')
-        driver = webdriver.Chrome(options=options)  # Example for Chrome, you can use other browsers as well
+        options = webdriver.FirefoxOptions()
+        # options.add_argument("--enable-logging=stderr")
+        # options.add_argument('--log-level=3')
+
+        # options.headless = True
+	# Specify the path to the Chrome WebDriver
+        service = webdriver.firefox.service.Service('/usr/local/bin/geckodriver')
+        driver = webdriver.Firefox(service=service, options=options)  # Example for Chrome, you can use other browsers as well
 
         # Open the webpage
         driver.get(url)
