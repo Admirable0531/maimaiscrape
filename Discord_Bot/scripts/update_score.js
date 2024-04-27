@@ -69,16 +69,21 @@ module.exports = {
             const prefix = rating_diff >= 0 ? '+' : '-';
             const rating_diff_str = "(" + prefix + Math.abs(rating_diff).toString() + "rt)";
         
-            // Extract song names
-            const songsInFile1New = new Set(data1.new.map(song => song.Song));
-            const songsInFile2New = new Set(data2.new.map(song => song.Song));
-
-            const songsInFile1Old = new Set(data1.old.map(song => song.Song));
-            const songsInFile2Old = new Set(data2.old.map(song => song.Song));
-        
             // Songs present in file1 but missing in file2
-            const missingInFile2New = [...songsInFile1New].filter(song => !songsInFile2New.has(song));
-            const missingInFile2Old = [...songsInFile1Old].filter(song => !songsInFile2Old.has(song));
+            const missingInFile2New = data1.new.filter(entry => {
+                // Find the corresponding entry in file 2
+                const correspondingEntry = data2.new.find(item => item.Song === entry.Song);
+                
+                // Check if the corresponding entry exists and if the ratings match
+                return !correspondingEntry || correspondingEntry.Rating !== entry.Rating;
+            });
+            const missingInFile2Old = data1.old.filter(entry => {
+                // Find the corresponding entry in file 2
+                const correspondingEntry = data2.old.find(item => item.Song === entry.Song);
+                
+                // Check if the corresponding entry exists and if the ratings match
+                return !correspondingEntry || correspondingEntry.Rating !== entry.Rating;
+            });
         
             // Print songs present in file1 but missing in file2
             if (missingInFile2New.length > 0) {
