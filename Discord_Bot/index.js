@@ -61,10 +61,25 @@ client.on(Events.InteractionCreate, async interaction => {
 // Log in to Discord with your client's token
 client.login(token);
 
-cron.schedule('2 16 * * *', async () => {
-    // Call your function here
-	const channel = await client.channels.fetch("1233678655717118022");
+async function test() {
 	const anotherFile = require('./scripts/update_score.js');
+	const channel = await client.channels.fetch("1233678655717118022");
+	
+
+// Now you can call functions or access variables from anotherFile.js
+	await anotherFile.execute(channel);
+}
+setTimeout(() => {
+    // Code to execute after the delay
+    console.log("Delay complete. This code runs after 5 seconds.");
+	test()
+}, 3000);
+
+cron.schedule('0 0 * * *', async () => {
+    // Call your function here
+	const anotherFile = require('./scripts/update_score.js');
+	const channel = await client.channels.fetch("1233678655717118022");
+	
 
 // Now you can call functions or access variables from anotherFile.js
 	await anotherFile.execute(channel);

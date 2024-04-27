@@ -20,6 +20,7 @@ module.exports = {
         
         const uri = 'mongodb://localhost:27017';
         const dbName = 'mydatabase';
+        // 
         const users = ["ryan", "jiayi", "marcus", "kok", "yuan", "keyang"]
         const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
         
@@ -59,7 +60,6 @@ module.exports = {
             // Load JSON files
             const data1 = JSON.parse(file1);
             const data2 = JSON.parse(file2);
-            console.log(data1);
 
             const rating1 = data1.rating;
             const rating2 = data2.rating;
@@ -73,7 +73,7 @@ module.exports = {
             const missingInFile2New = data1.new.filter(entry => {
                 // Find the corresponding entry in file 2
                 const correspondingEntry = data2.new.find(item => item.Song === entry.Song);
-                
+
                 // Check if the corresponding entry exists and if the ratings match
                 return !correspondingEntry || correspondingEntry.Rating !== entry.Rating;
             });
@@ -89,9 +89,9 @@ module.exports = {
             if (missingInFile2New.length > 0) {
                 console.log("Songs present in file1 but missing in file2:");
                 missingInFile2New.forEach( song => {
-                    const matchingData = data1.new.find(data => data.Song === song);
-                    console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
-                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | ${song} (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | NEW`);
+                    const matchingData = data1.new.find(data => data.Song === song.Song);
+                    console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song.Song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
+                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | ${song.Song} (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | NEW`);
                     });
             } else {
                 console.log("All songs in file1 are also present in file2.");
@@ -100,9 +100,9 @@ module.exports = {
             if (missingInFile2Old.length > 0) {
                 console.log("Songs present in file1 but missing in file2:");
                 missingInFile2Old.forEach( song => {
-                    const matchingData = data1.old.find(data => data.Song === song);
-                    console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
-                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | ${song} (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | OLD`);
+                    const matchingData = data1.old.find(data => data.Song === song.Song);
+                    console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song.Song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
+                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | ${song.Song} (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | OLD`);
                     });
             } else {
                 console.log("All songs in file1 are also present in file2.");
@@ -110,7 +110,6 @@ module.exports = {
             if(new_records.length === 0){
 
             } else {
-                console.log(new_records);
                 const [user_img_src, user_name, user_rating] = await getUserInfo(user);
                 const newEmbed = new EmbedBuilder()
                     .setColor(0x7289da)
