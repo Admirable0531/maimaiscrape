@@ -25,20 +25,21 @@ def update():
     login_user = os.getenv("MAIMAI_USER")
     login_pass = os.getenv("MAIMAI_PASS")
 
-    firefox_binary_path = r"C:\Program Files\Mozilla Firefox\firefox.exe"
+    firefox_binary_path = "/usr/bin/firefox"
 
     # URL of the website you want to scrape
     url = "https://maimaidx-eng.com"
 
     # try:
     options = Options()
-    options.binary_location = firefox_binary_path
+#    options.binary_location = firefox_binary_path
     # options.add_argument("--enable-logging=stderr")
     # options.add_argument('--log-level=3')
 
     # options.headless = True
 # Specify the path to the Chrome WebDriver
-    service = webdriver.firefox.service.Service(r'C:\Users\USER\Downloads\geckodriver-v0.34.0-win32\geckodriver.exe')
+    geckodriver_path = "/snap/bin/firefox.geckodriver"
+    service = webdriver.firefox.service.Service(geckodriver_path)
     driver = webdriver.Firefox(service=service, options=options)  # Example for Chrome, you can use other browsers as well
 
     # Open the webpage
