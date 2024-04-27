@@ -2,6 +2,7 @@
 const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
 const path = require('path');
 const fs = require('node:fs');
+const cron = require('node-cron');
 
 // Import the dotenv library
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
@@ -59,3 +60,12 @@ client.on(Events.InteractionCreate, async interaction => {
 
 // Log in to Discord with your client's token
 client.login(token);
+
+cron.schedule('33 15 * * *', async () => {
+    // Call your function here
+	const channel = await client.channels.fetch("1233678655717118022");
+	const anotherFile = require('./scripts/update_score.js');
+
+// Now you can call functions or access variables from anotherFile.js
+	await anotherFile.execute(channel);
+});
