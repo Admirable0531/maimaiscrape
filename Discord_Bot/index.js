@@ -61,7 +61,7 @@ client.on(Events.InteractionCreate, async interaction => {
 // Log in to Discord with your client's token
 client.login(token);
 
-cron.schedule('33 15 * * *', async () => {
+cron.schedule('2 16 * * *', async () => {
     // Call your function here
 	const channel = await client.channels.fetch("1233678655717118022");
 	const anotherFile = require('./scripts/update_score.js');

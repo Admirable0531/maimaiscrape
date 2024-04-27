@@ -302,8 +302,8 @@ def update():
         filename = traceback_object.tb_frame.f_code.co_filename
         print(f"Error occurred at line {line_number} of {filename}")
 
-schedule.every().day.at("15:39").do(update)
-
+schedule.every().day.at("16:00").do(update)
+update()
 while True:
     schedule.run_pending()
     time.sleep(60)  # Sleep for 60 seconds before checking again
