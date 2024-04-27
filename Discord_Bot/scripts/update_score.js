@@ -1,14 +1,8 @@
-const { SlashCommandBuilder } = require('discord.js');
 const { MongoClient } = require('mongodb');
 const { EmbedBuilder } = require('discord.js');
-const fs = require('fs');
 
 module.exports = {
-	data: new SlashCommandBuilder()
-		.setName('dailyupdate')
-		.setDescription('Update rating gains daily'),
-	async execute(interaction) {
-        const channel = interaction.channel;
+	async execute(channel) {
         var today = new Date();
         var day = today.getDate();
         var month = today.getMonth() + 1;
