@@ -91,10 +91,7 @@ def update():
         new_records=[]
         
         for row in soup.find_all('tr', class_='scoreRecordRow')[1:]:
-            next_sibling = row.find_next_sibling()
-            if next_sibling and 'class' in next_sibling.attrs:
-            # Extract and print the class
-                diff = next_sibling['class'][1]
+            diff = row['class'][1]
             new_record = {}
             cells = row.find_all('td')
             new_record['#'] = cells[0].text.strip()
@@ -118,10 +115,7 @@ def update():
         old_records=[]
         
         for row in soup.find_all('tr', class_='scoreRecordRow')[1:]:
-            next_sibling = row.find_next_sibling()
-            if next_sibling and 'class' in next_sibling.attrs:
-            # Extract and print the class
-                diff = next_sibling['class'][1]
+            diff = row['class'][1]
             old_record = {}
             cells = row.find_all('td')
             old_record['#'] = cells[0].text.strip()
