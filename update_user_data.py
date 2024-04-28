@@ -24,23 +24,23 @@ def update():
     # Access variables
     login_user = os.getenv("MAIMAI_USER")
     login_pass = os.getenv("MAIMAI_PASS")
+    gecko_path = os.getenv("GECKO_PATH")
 
-    firefox_binary_path = "/usr/bin/firefox"
+    firefox_binary_path = r"C:\Program Files\Mozilla Firefox\firefox.exe"
 
     # URL of the website you want to scrape
     url = "https://maimaidx-eng.com"
 
     # try:
     options = Options()
-#    options.binary_location = firefox_binary_path
+    options.binary_location = firefox_binary_path
     # options.add_argument("--enable-logging=stderr")
     # options.add_argument('--log-level=3')
 
     options.add_argument("--headless")
 # Specify the path to the Chrome WebDriver
-    geckodriver_path = "/snap/bin/firefox.geckodriver"
-    service = webdriver.firefox.service.Service(geckodriver_path)
-    driver = webdriver.Firefox(service=service, options=options)  # Example for Chrome, you can use other browsers as well
+    service = Service(gecko_path)
+    driver = webdriver.Firefox(service=service, options=options)
 
     # Open the webpage
     driver.get(url)
@@ -90,8 +90,11 @@ def update():
         soup = BeautifulSoup(new_rating, 'html.parser')
         new_records=[]
         
-        
         for row in soup.find_all('tr', class_='scoreRecordRow')[1:]:
+            next_sibling = row.find_next_sibling()
+            if next_sibling and 'class' in next_sibling.attrs:
+            # Extract and print the class
+                diff = next_sibling['class'][1]
             new_record = {}
             cells = row.find_all('td')
             new_record['#'] = cells[0].text.strip()
@@ -101,6 +104,7 @@ def update():
             new_record['Achv'] = cells[4].text.strip()
             new_record['Rank'] = cells[5].text.strip()
             new_record['Rating'] = cells[6].text.strip()
+            new_record['Diff'] = diff
             new_records.append(new_record)
 
         old_rating_elements = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
@@ -113,8 +117,11 @@ def update():
         soup = BeautifulSoup(old_rating, 'html.parser')
         old_records=[]
         
-        
         for row in soup.find_all('tr', class_='scoreRecordRow')[1:]:
+            next_sibling = row.find_next_sibling()
+            if next_sibling and 'class' in next_sibling.attrs:
+            # Extract and print the class
+                diff = next_sibling['class'][1]
             old_record = {}
             cells = row.find_all('td')
             old_record['#'] = cells[0].text.strip()
@@ -124,6 +131,7 @@ def update():
             old_record['Achv'] = cells[4].text.strip()
             old_record['Rank'] = cells[5].text.strip()
             old_record['Rating'] = cells[6].text.strip()
+            old_record['Diff'] = diff
             old_records.append(old_record)
         
         rating = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.totalRating')))
