@@ -74,7 +74,6 @@ module.exports = {
                 // Find the corresponding entry in file 2
                 const correspondingEntry = data2.new.find(item => item.Song === entry.Song && item.Diff === entry.Diff);
                 if (correspondingEntry) {
-                    console.log(correspondingEntry.Song + " " + correspondingEntry.Diff)
                     // Check if the ratings or achievements match
                     return correspondingEntry.Rating !== entry.Rating || correspondingEntry.Achv !== entry.Achv;
                 }
