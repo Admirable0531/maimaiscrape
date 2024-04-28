@@ -36,7 +36,7 @@ def update():
     # options.add_argument("--enable-logging=stderr")
     # options.add_argument('--log-level=3')
 
-    # options.headless = True
+    options.add_argument("--headless")
 # Specify the path to the Chrome WebDriver
     geckodriver_path = "/snap/bin/firefox.geckodriver"
     service = webdriver.firefox.service.Service(geckodriver_path)
@@ -152,7 +152,7 @@ def update():
     formatted_date = current_date.strftime("%d/%m/%Y")
 
     def get_ryan_info():
-        user_img_element = WebDriverWait(driver, 10).until(
+        user_img_element = WebDriverWait(driver, 30).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, ".w_112.f_l"))
         )
         user_img_src = user_img_element.get_attribute("src")
@@ -211,9 +211,14 @@ def update():
         wait = WebDriverWait(driver, 10)
         wait.until(EC.visibility_of_element_located((By.TAG_NAME, "body")))
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        user_img_elements = WebDriverWait(driver, 10).until(
-            EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".w_112.f_l"))
-        )
+        collection = driver.find_elements(By.CSS_SELECTOR,  ".w_112.f_l")
+        user_img_elements=[]
+        for item in collection:
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'})", item)
+            user_img_elements.append(item)
+        #user_img_elements = WebDriverWait(driver, 30).until(
+        #    EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".w_112.f_l"))
+        #)
         user_img_src = [element.get_attribute("src") for element in user_img_elements]
         
         user_name_elements = WebDriverWait(driver, 10).until(
@@ -300,7 +305,7 @@ def update():
     driver.switch_to.window(driver.window_handles[1])
     collection = db["keyang_top"]
     collection.insert_one(get_top_score())
-
+    print("DONE")
     driver.close()
 
 
@@ -314,7 +319,7 @@ def update():
     #     filename = traceback_object.tb_frame.f_code.co_filename
     #     print(f"Error occurred at line {line_number} of {filename}")
 
-schedule.every().day.at("16:00").do(update)
+schedule.every().day.at("23:55").do(update)
 update()
 while True:
     schedule.run_pending()
