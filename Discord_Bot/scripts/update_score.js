@@ -72,17 +72,24 @@ module.exports = {
             // Songs present in file1 but missing in file2
             const missingInFile2New = data1.new.filter(entry => {
                 // Find the corresponding entry in file 2
-                const correspondingEntry = data2.new.find(item => item.Song === entry.Song);
-
+                const correspondingEntry = data2.new.find(item => item.Song === entry.Song && item.Diff === entry.Diff);
+                if (correspondingEntry) {
+                    console.log(correspondingEntry.Song + " " + correspondingEntry.Diff)
+                    // Check if the ratings or achievements match
+                    return correspondingEntry.Rating !== entry.Rating || correspondingEntry.Achv !== entry.Achv;
+                }
                 // Check if the corresponding entry exists and if the ratings match
-                return !correspondingEntry || correspondingEntry.Rating !== entry.Rating;
+                return true;
             });
             const missingInFile2Old = data1.old.filter(entry => {
                 // Find the corresponding entry in file 2
-                const correspondingEntry = data2.old.find(item => item.Song === entry.Song);
-                
+                const correspondingEntry = data2.old.find(item => item.Song === entry.Song && item.Diff === entry.Diff);
+                if (correspondingEntry) {
+                    // Check if the ratings or achievements match
+                    return correspondingEntry.Rating !== entry.Rating || correspondingEntry.Achv !== entry.Achv;
+                }
                 // Check if the corresponding entry exists and if the ratings match
-                return !correspondingEntry || correspondingEntry.Rating !== entry.Rating;
+                return true;
             });
         
             // Print songs present in file1 but missing in file2
@@ -90,8 +97,9 @@ module.exports = {
                 console.log("Songs present in file1 but missing in file2:");
                 missingInFile2New.forEach( song => {
                     const matchingData = data1.new.find(data => data.Song === song.Song);
+                    const songLink = "https://arcade-songs.zetaraku.dev/maimai/?title=" + encodeURIComponent(song.Song) + "&types=" + encodeURIComponent(matchingData.Chart.toLowerCase());
                     console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song.Song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
-                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | ${song.Song} (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | NEW`);
+                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | [${song.Song}](${songLink}) [${matchingData.Diff.toUpperCase()}] (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | NEW`);
                     });
             } else {
                 console.log("All songs in file1 are also present in file2.");
@@ -101,8 +109,9 @@ module.exports = {
                 console.log("Songs present in file1 but missing in file2:");
                 missingInFile2Old.forEach( song => {
                     const matchingData = data1.old.find(data => data.Song === song.Song);
+                    const songLink = "https://arcade-songs.zetaraku.dev/maimai/?title=" + encodeURIComponent(song.Song) + "&types=" + encodeURIComponent(matchingData.Chart.toLowerCase());
                     console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song.Song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
-                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | ${song.Song} (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | OLD`);
+                    new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | [${song.Song}](${songLink}) [${matchingData.Diff.toUpperCase()}]  (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | OLD`);
                     });
             } else {
                 console.log("All songs in file1 are also present in file2.");
