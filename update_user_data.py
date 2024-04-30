@@ -26,14 +26,22 @@ def update():
     login_pass = os.getenv("MAIMAI_PASS")
     gecko_path = os.getenv("GECKO_PATH")
 
-    firefox_binary_path = r"C:\Program Files\Mozilla Firefox\firefox.exe"
+    #firefox_binary_path = r"C:\Program Files\Mozilla Firefox\firefox.exe"
 
     # URL of the website you want to scrape
     url = "https://maimaidx-eng.com"
 
     # try:
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36"
     options = Options()
-    options.binary_location = firefox_binary_path
+    options.add_argument("--proxy-server='direct://'")
+    options.add_argument("--proxy-bypass-list=*")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-dev-shm-usage")
+    #options.add_argument("--no-sandbox")
+    #options.add_argument("--proxy-server=")
+    #options.add_argument("blink-settings=imagesEnabled=false")
+    #options.binary_location = firefox_binary_path
     # options.add_argument("--enable-logging=stderr")
     # options.add_argument('--log-level=3')
 
@@ -65,7 +73,7 @@ def update():
     login_button.click()
 
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
-
+    print("Done Login")
     try:
         script = """
             (function(d){
@@ -81,7 +89,7 @@ def update():
         print(e)
 
     def get_top_score():
-        new_rating_elements = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
+        new_rating_elements = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
         
         if len(new_rating_elements) >= 2:
             first_element = new_rating_elements[0]
@@ -104,7 +112,7 @@ def update():
             new_record['Diff'] = diff
             new_records.append(new_record)
 
-        old_rating_elements = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
+        old_rating_elements = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
         
         if len(old_rating_elements) >= 2:
             # Get the second element
@@ -128,7 +136,7 @@ def update():
             old_record['Diff'] = diff
             old_records.append(old_record)
         
-        rating = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.totalRating')))
+        rating = WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.totalRating')))
         text = rating.text
 
         rating = int(text.split("：")[1])
@@ -139,6 +147,7 @@ def update():
             "rating": rating,
             "Date": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         }
+        print("Done Score")
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
         return data
@@ -154,7 +163,7 @@ def update():
     formatted_date = current_date.strftime("%d/%m/%Y")
 
     def get_ryan_info():
-        user_img_element = WebDriverWait(driver, 30).until(
+        user_img_element = WebDriverWait(driver, 60).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, ".w_112.f_l"))
         )
         user_img_src = user_img_element.get_attribute("src")
@@ -187,12 +196,12 @@ def update():
         EC.visibility_of_element_located((By.LINK_TEXT, "Analyze Rating"))
     )
     analyze_rating_link.click()
-    
+    print("Done Ryan Info")
     driver.switch_to.window(driver.window_handles[1])
     
     collection = db["ryan_top"]
     collection.insert_one(get_top_score())
-    
+    print("Done Ryan Score")
     driver.get('https://maimaidx-eng.com/maimai-mobile/friend/')
 
     try:
@@ -218,7 +227,7 @@ def update():
         for item in collection:
             driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'})", item)
             user_img_elements.append(item)
-        #user_img_elements = WebDriverWait(driver, 30).until(
+        #user_img_elements = WebDriverWait(driver, 45).until(
         #    EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".w_112.f_l"))
         #)
         user_img_src = [element.get_attribute("src") for element in user_img_elements]
@@ -255,7 +264,7 @@ def update():
             }
             collection = db["user_info"]
             collection.insert_one(user_data)
-
+            print("Done " + choose + " Info")
     get_user_info()
 
 # Jiayi
@@ -321,7 +330,7 @@ def update():
     #     filename = traceback_object.tb_frame.f_code.co_filename
     #     print(f"Error occurred at line {line_number} of {filename}")
 
-schedule.every().day.at("23:55").do(update)
+schedule.every().day.at("23:45").do(update)
 update()
 while True:
     schedule.run_pending()
