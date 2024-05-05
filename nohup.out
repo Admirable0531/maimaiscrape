@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/home/ryan/Desktop/maimai/maimaiscrape/update_user_data.py", line 335, in <module>
+    update()
+  File "/home/ryan/Desktop/maimai/maimaiscrape/update_user_data.py", line 52, in update
+    driver = webdriver.Firefox(service=service, options=options)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ryan/Desktop/maimai/maimaiscrape/venv/lib/python3.12/site-packages/selenium/webdriver/firefox/webdriver.py", line 74, in __init__
+    super().__init__(command_executor=executor, options=options)
+  File "/home/ryan/Desktop/maimai/maimaiscrape/venv/lib/python3.12/site-packages/selenium/webdriver/remote/webdriver.py", line 208, in __init__
+    self.start_session(capabilities)
+  File "/home/ryan/Desktop/maimai/maimaiscrape/venv/lib/python3.12/site-packages/selenium/webdriver/remote/webdriver.py", line 292, in start_session
+    response = self.execute(Command.NEW_SESSION, caps)["value"]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ryan/Desktop/maimai/maimaiscrape/venv/lib/python3.12/site-packages/selenium/webdriver/remote/webdriver.py", line 347, in execute
+    self.error_handler.check_response(response)
+  File "/home/ryan/Desktop/maimai/maimaiscrape/venv/lib/python3.12/site-packages/selenium/webdriver/remote/errorhandler.py", line 229, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.WebDriverException: Message: Failed to decode response from marionette
+
