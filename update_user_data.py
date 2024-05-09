@@ -267,10 +267,12 @@ def update():
             print("Done " + choose + " Info")
     get_user_info()
 
-# Jiayi
-    analyze_rating_link = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8067013466678&playerName=%E2%99%AA"]'))
+    elements = WebDriverWait(driver, 10).until(
+        EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'a[target="friendRating"]'))
     )
+
+# Jiayi
+    analyze_rating_link = elements[4]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     
@@ -279,9 +281,7 @@ def update():
 
 
 # Markus
-    analyze_rating_link = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8071982688053&playerName=%EF%BC%A2%EF%BC%AC%EF%BC%B5%EF%BC%A5%E3%80%80%EF%BC%AF%CF%89%EF%BC%AF"]'))
-    )
+    analyze_rating_link = elements[5]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["marcus_top"]
@@ -289,9 +289,7 @@ def update():
 
 
 # Kok
-    analyze_rating_link = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8085423055111&playerName=%EF%BC%A9%EF%BC%AE%EF%BC%A6%EF%BC%A9%EF%BC%AE%EF%BC%A9%EF%BC%B4%EF%BC%B9"]'))
-    )
+    analyze_rating_link = elements[5]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["kok_top"]
@@ -299,9 +297,7 @@ def update():
 
 
 # Yuan
-    analyze_rating_link = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8070962675681&playerName=%EF%BD%99%EF%BD%95%EF%BD%81%EF%BD%8E%E3%80%80%EF%BC%AF%D0%94%EF%BC%AF"]'))
-    )
+    analyze_rating_link = elements[6]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["yuan_top"]
@@ -309,9 +305,7 @@ def update():
 
 
 # Keyang
-    analyze_rating_link = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.CSS_SELECTOR, 'a[target="friendRating"][href="https://myjian.github.io/mai-tools/rating-calculator/?region=intl&friendIdx=8091021494559&playerName=%EF%BD%84%EF%BC%88%EF%BC%9A%EF%BC%93%EF%BC%89%EF%BC%8F%EF%BD%84%EF%BD%98"]'))
-    )
+    analyze_rating_link = elements[7]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["keyang_top"]
