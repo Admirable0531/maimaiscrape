@@ -26,7 +26,7 @@ def update():
     login_pass = os.getenv("MAIMAI_PASS")
     gecko_path = os.getenv("GECKO_PATH")
 
-    #firefox_binary_path = r"C:\Program Files\Mozilla Firefox\firefox.exe"
+    # firefox_binary_path = r"C:\Program Files\Mozilla Firefox\firefox.exe"
 
     # URL of the website you want to scrape
     url = "https://maimaidx-eng.com"
@@ -41,11 +41,11 @@ def update():
     #options.add_argument("--no-sandbox")
     #options.add_argument("--proxy-server=")
     #options.add_argument("blink-settings=imagesEnabled=false")
-    #options.binary_location = firefox_binary_path
+    # options.binary_location = firefox_binary_path
     # options.add_argument("--enable-logging=stderr")
     # options.add_argument('--log-level=3')
 
-    options.add_argument("--headless")
+    # options.add_argument("--headless")
 # Specify the path to the Chrome WebDriver
     service = Service(gecko_path)
     driver = webdriver.Firefox(service=service, options=options)
@@ -242,16 +242,16 @@ def update():
         )
         user_rating = [element.text for element in user_rating_elements]
 
-        for i in range(1, 6):
-            if i == 1:
+        for i in range(3, 8):
+            if i == 3:
                 choose = "jiayi"
-            elif i == 2:
-                choose = "marcus"
-            elif i == 3:
-                choose = "kok"
             elif i == 4:
-                choose = "yuan"
+                choose = "marcus"
             elif i == 5:
+                choose = "kok"
+            elif i == 6:
+                choose = "yuan"
+            elif i == 7:
                 choose = "keyang"
             else:
                 print("error user")
@@ -272,7 +272,7 @@ def update():
     )
 
 # Jiayi
-    analyze_rating_link = elements[4]
+    analyze_rating_link = elements[3]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     
@@ -281,7 +281,7 @@ def update():
 
 
 # Markus
-    analyze_rating_link = elements[5]
+    analyze_rating_link = elements[4]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["marcus_top"]
