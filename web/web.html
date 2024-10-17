@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rating Graph</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <input type="text" id="userInput" placeholder="Enter user name" />
+    <select id="intervalSelect">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+    </select>
+    <button id="fetchData">Fetch Data</button>
+    
+    <canvas id="ratingChart"></canvas>
+
+    <script>
+        document.getElementById('fetchData').addEventListener('click', async () => {
+            const user = document.getElementById('userInput').value;
+            const interval = document.getElementById('intervalSelect').value;
+            const response = await fetch(`http://192.168.100.143:3000/api/ratings/${user}?interval=${interval}`);
+            const data = await response.json();
+            renderChart(data);
+        });
+        let chart;
+        function renderChart(data) {
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            const ctx = document.getElementById('ratingChart').getContext('2d');
+            const labels = data.map(item => item.date); // Dates for X-axis
+            const ratings = data.map(item => item.rating); // Ratings for Y-axis
+
+
+            const maxRating = Math.max(...data.map(song => parseFloat(song.rating)));
+
+            // Set the y-axis limits
+            const yMin = Math.max(maxRating - 500, 0); // Ensure minimum doesn't go below 0
+            const yMax = maxRating + 50; // Optional: Set a small buffer above the max rating
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'User Ratings',
+                        data: ratings,
+                        fill: false,
+                        borderColor: 'blue',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            min: yMin,
+                            max: yMax,
+                            title: {
+                                display: true,
+                                text: 'Rating'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            // Customize the tooltip if needed
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    return `Rating: ${tooltipItem.raw}`;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'index', // This allows hovering over the entire dataset along the Y-axis
+                        intersect: false // Allows hovering without needing to directly over the dot
+                    },
+                }
+            });
+        }
+    </script>
+</body>
+</html>

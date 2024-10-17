@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ratings Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        canvas {
+            max-width: 90%;
+            max-height: 80vh;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="ratingChart"></canvas>
+    <script>
+        async function fetchData() {
+            const users = ['ryan', 'yuan', 'marcus', 'kok', 'keyang'];
+            const promises = users.map(user => 
+                fetch(`http://192.168.100.143:3000/api/ratings/${user}?interval=daily`).then(res => res.json())
+            );
+            const data = await Promise.all(promises);
+            renderChart(data);
+        }
+
+        function renderChart(data) {
+            const labels = data[0].map(d => d.date); // Assuming all users have the same dates
+            const userNames = ['Ryan', 'Yuan', 'Marcus', 'Kok', 'Keyang']; // User-friendly names
+
+            const datasets = data.map((userData, index) => ({
+                label: userNames[index], // Use friendly names
+                data: userData.map(d => parseFloat(d.rating)),
+                borderColor: `hsl(${index * 60}, 70%, 50%)`, // Different color for each user
+                fill: false,
+                tension: 0.1
+            }));
+
+            const ctx = document.getElementById('ratingChart').getContext('2d');
+
+            // Check if chart exists and destroy it if it does
+            if (window.ratingChart instanceof Chart) {
+                window.ratingChart.destroy(); // Only destroy if it exists and is a Chart instance
+            }
+
+            window.ratingChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false, // Adjust as needed
+                            title: {
+                                display: true,
+                                text: 'Rating'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
