@@ -242,16 +242,16 @@ def update():
         )
         user_rating = [element.text for element in user_rating_elements]
 
-        for i in range(1, 6):
-            if i == 1:
-                choose = "jiayi"
-            elif i == 2:
-                choose = "marcus"
+        for i in range(2, 7):
+            if i == 2:
+                choose = "yuchen"
             elif i == 3:
-                choose = "kok"
+                choose = "marcus"
             elif i == 4:
-                choose = "yuan"
+                choose = "kok"
             elif i == 5:
+                choose = "yuan"
+            elif i == 6:
                 choose = "keyang"
             else:
                 print("error user")
@@ -271,17 +271,17 @@ def update():
         EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'a[target="friendRating"]'))
     )
 
-# Jiayi
-    analyze_rating_link = elements[4]
+# Yuchen
+    analyze_rating_link = elements[2]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     
-    collection = db["jiayi_top"]
+    collection = db["yuchen_top"]
     collection.insert_one(get_top_score())
 
 
 # Markus
-    analyze_rating_link = elements[5]
+    analyze_rating_link = elements[3]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["marcus_top"]
@@ -289,7 +289,7 @@ def update():
 
 
 # Kok
-    analyze_rating_link = elements[5]
+    analyze_rating_link = elements[4]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["kok_top"]
@@ -297,7 +297,7 @@ def update():
 
 
 # Yuan
-    analyze_rating_link = elements[6]
+    analyze_rating_link = elements[5]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["yuan_top"]
@@ -305,7 +305,7 @@ def update():
 
 
 # Keyang
-    analyze_rating_link = elements[7]
+    analyze_rating_link = elements[6]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["keyang_top"]
@@ -324,7 +324,7 @@ def update():
     #     filename = traceback_object.tb_frame.f_code.co_filename
     #     print(f"Error occurred at line {line_number} of {filename}")
 
-schedule.every().day.at("23:45").do(update)
+schedule.every().day.at("22:45").do(update)
 update()
 while True:
     schedule.run_pending()

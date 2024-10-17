@@ -12,10 +12,13 @@ module.exports = {
         var today = new Date();
         var day = today.getDate();
         var month = today.getMonth() + 1;
+        var yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
         var formattedDay = ("0" + day).slice(-2);
-        var formattedYesterday = ("0" + (day-1)).slice(-2);
+        var formattedYesterday = ("0" + (yesterday.getDate())).slice(-2);
         var formattedMonth = ("0" + month).slice(-2);
-        var yesterdayDate = formattedYesterday + "/" + formattedMonth;
+        var formattedYesterMonth = ("0" + yesterday.getMonth()).slice(-2);
+        var yesterdayDate = formattedYesterday + "/" + formattedYesterMonth;
         var todayDate = formattedDay + "/" + formattedMonth;
 
         const exampleEmbed = new EmbedBuilder()

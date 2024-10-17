@@ -1,8 +1,8 @@
 {
-  "name": "discord_bot",
+  "name": "rest",
   "version": "1.0.0",
   "description": "",
-  "main": "discord.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -10,11 +10,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "mongodb": "^6.5.0",
-    "node-cron": "^3.0.3",
-    "puppeteer": "^23.6.0",
-    "xlsx": "^0.18.5"
+    "express": "^4.21.0",
+    "mongoose": "^8.7.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17"
   }
 }

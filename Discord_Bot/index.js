@@ -75,7 +75,7 @@ setTimeout(() => {
 	test()
 }, 3000);
 
-cron.schedule('0 0 * * *', async () => {
+cron.schedule('0 23 * * *', async () => {
     // Call your function here
 	const anotherFile = require('./scripts/update_score.js');
 	const channel = await client.channels.fetch("1233678655717118022");

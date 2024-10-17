@@ -4,10 +4,12 @@ const { EmbedBuilder } = require('discord.js');
 module.exports = {
 	async execute(channel) {
         var today = new Date();
+        var yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
         var day = today.getDate();
         var month = today.getMonth() + 1;
         var formattedDay = ("0" + day).slice(-2);
-        var formattedYesterday = ("0" + (day-1)).slice(-2);
+        var formattedYesterday = ("0" + yesterday.getDate()).slice(-2);
         var formattedMonth = ("0" + month).slice(-2);
         var yesterdayDate = formattedYesterday + "/" + formattedMonth;
         var todayDate = formattedDay + "/" + formattedMonth;
@@ -21,7 +23,7 @@ module.exports = {
         const uri = 'mongodb://localhost:27017';
         const dbName = 'mydatabase';
         // 
-        const users = ["ryan", "jiayi", "marcus", "kok", "yuan", "keyang"]
+        const users = ["ryan", "yuchen", "marcus", "kok", "yuan", "keyang"]
         const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
         
         for (const auser in users) {
@@ -95,7 +97,7 @@ module.exports = {
             if (missingInFile2New.length > 0) {
                 console.log("Songs present in file1 but missing in file2:");
                 missingInFile2New.forEach( song => {
-                    const matchingData = data1.new.find(data => data.Song === song.Song);
+                    const matchingData = data1.new.find(data => data.Song === song.Song && data.Diff === song.Diff);
                     const songLink = "https://arcade-songs.zetaraku.dev/maimai/?title=" + encodeURIComponent(song.Song) + "&types=" + encodeURIComponent(matchingData.Chart.toLowerCase());
                     console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song.Song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
                     new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | [${song.Song}](${songLink}) [${matchingData.Diff.toUpperCase()}] (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | NEW`);
@@ -107,7 +109,7 @@ module.exports = {
             if (missingInFile2Old.length > 0) {
                 console.log("Songs present in file1 but missing in file2:");
                 missingInFile2Old.forEach( song => {
-                    const matchingData = data1.old.find(data => data.Song === song.Song);
+                    const matchingData = data1.old.find(data => data.Song === song.Song && data.Diff === song.Diff);
                     const songLink = "https://arcade-songs.zetaraku.dev/maimai/?title=" + encodeURIComponent(song.Song) + "&types=" + encodeURIComponent(matchingData.Chart.toLowerCase());
                     console.log(`- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song.Song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`);
                     new_records.push(`${matchingData.Rank} | ${matchingData.Rating}rt | [${song.Song}](${songLink}) [${matchingData.Diff.toUpperCase()}]  (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | OLD`);
