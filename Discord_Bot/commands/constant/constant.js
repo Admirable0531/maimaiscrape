@@ -30,24 +30,33 @@ module.exports = {
             // The constantValue is invalid
             await interaction.editReply({ content: 'Please provide a valid constant value (14.0 to 15.0) without whole numbers (14 or 15).', ephemeral: true });
             return;
+
+        }
+        
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+
+        const guy = interaction.options.getString('guy');
+        if(guy){
+            if (!['klcc', 'marcus', 'yuan', 'keyang', 'yuchen', 'jerry', 'kok'].includes(guy.toLowerCase())) {
+                await interaction.editReply(`The name "${guy}" is not recognized.`);
+                return;
+            }
+            man = capitalizeFirstLetter(guy.toLowerCase());
+        } else {
+            man = "Azu";
         }
         const xlsxFilePath = './contents/prismConstant.xlsx';
         const songs = await scrape(findSongsByConstant(constantValue));
         await songs.sort((a, b) => {
-            const scoreA = a[2] ? parseFloat(a[2]) : -Infinity; // Treat undefined as the lowest
-            const scoreB = b[2] ? parseFloat(b[2]) : -Infinity; // Treat undefined as the lowest
+            // Check for valid numeric values, handle '― %' and undefined as -Infinity
+            const scoreA = (a[2] && a[2] !== '― %') ? parseFloat(a[2]) : -Infinity;
+            const scoreB = (b[2] && b[2] !== '― %') ? parseFloat(b[2]) : -Infinity;
         
             return scoreB - scoreA; // Sort in descending order
         });
-        function capitalizeFirstLetter(string) {
-            return string.charAt(0).toUpperCase() + string.slice(1);
-        }
-        const guy = interaction.options.getString('guy');
-        if(guy){
-            man = capitalizeFirstLetter(guy);
-        } else {
-            man = "Azu";
-        }
+        
         if (songs && songs.length > 0) {
             // Join the songs into a single string and send as a response
             const songDescriptions = songs.map(song => `${song[0]}: ${song[1]} - ${song[2]}`).join('\n');
