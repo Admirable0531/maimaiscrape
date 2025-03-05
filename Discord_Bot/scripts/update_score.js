@@ -10,8 +10,9 @@ module.exports = {
         var month = today.getMonth() + 1;
         var formattedDay = ("0" + day).slice(-2);
         var formattedYesterday = ("0" + yesterday.getDate()).slice(-2);
+        var formattedYesterMonth = ("0" + (yesterday.getMonth()+1)).slice(-2);
         var formattedMonth = ("0" + month).slice(-2);
-        var yesterdayDate = formattedYesterday + "/" + formattedMonth;
+        var yesterdayDate = formattedYesterday + "/" + formattedYesterMonth;
         var todayDate = formattedDay + "/" + formattedMonth;
 
         const exampleEmbed = new EmbedBuilder()
