@@ -1,9 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
-const XLSX = require('xlsx');
-const path = require('path');
 const { EmbedBuilder  } = require('discord.js');
 const puppeteer = require('puppeteer');
-const fs = require('fs');
+const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const user = process.env.MAIMAI_USER;
 const pass = process.env.MAIMAI_PASS;
@@ -22,13 +20,12 @@ module.exports = {
                 .setName('guy')
                 .setDescription('guy')),
 	async execute(interaction) {
-        const channel = interaction.channel;
         await interaction.deferReply();
-        const constantValue = interaction.options.getString('constant');
+        let constantValue = interaction.options.getString('constant');
         if (!isNaN(constantValue) && constantValue >= 14.0 && constantValue <= 15.0) {
         } else {
             // The constantValue is invalid
-            await interaction.editReply({ content: 'Please provide a valid constant value (14.0 to 15.0) without whole numbers (14 or 15).', ephemeral: true });
+            await interaction.editReply({ content: 'Please provide a valid constant value (14.0 to 15.0)', ephemeral: true });
             return;
 
         }
@@ -47,12 +44,10 @@ module.exports = {
         } else {
             man = "Azu";
         }
-        const xlsxFilePath = './contents/prismConstant.xlsx';
-        const songs = await scrape(findSongsByConstant(constantValue));
+        const songs = await scrape();
         await songs.sort((a, b) => {
-            // Check for valid numeric values, handle '― %' and undefined as -Infinity
-            const scoreA = (a[2] && a[2] !== '― %') ? parseFloat(a[2]) : -Infinity;
-            const scoreB = (b[2] && b[2] !== '― %') ? parseFloat(b[2]) : -Infinity;
+            const scoreA = (a[2] && a[2] !== "N/A" && a[2] !== "― %") ? parseFloat(a[2]) : -Infinity;
+            const scoreB = (b[2] && b[2] !== "N/A" && b[2] !== "― %") ? parseFloat(b[2]) : -Infinity;
         
             return scoreB - scoreA; // Sort in descending order
         });
@@ -67,166 +62,147 @@ module.exports = {
             
             await interaction.editReply({ embeds: [embed] });
         } else {
-                
             await interaction.editReply(`No songs found for constant ${constantValue}`);
         }
 
-        function findSongsByConstant(value) {
-            // Read the .xlsx file
-            const workbook = XLSX.readFile(xlsxFilePath);
-            const sheetName = '14以上'; // Set the correct sheet name
-            const sheet = workbook.Sheets[sheetName];
-        
-            const songs = []; // Array to hold all matching songs
-        
-            // Columns for "新定数" (hardcoded)
-            const constantColumns = [4, 11, 18, 25, 32]; // Columns E, L, S, Z, AG
-        
-            // Convert the sheet to raw data format
-            const range = XLSX.utils.decode_range(sheet['!ref']); // Get the range of the sheet
-        
-            // Loop through each row in the range
-            for (let row = range.s.r; row <= range.e.r; row++) {
-                for (let col of constantColumns) {
-                    let constantCell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
-                    if (constantCell && constantCell.v == value) {
-                        // Assuming the song name is 5 columns to the left of the found constant
-                        let songCell = sheet[XLSX.utils.encode_cell({ r: row, c: col - 4 })];
-                        if (songCell) {
-                            let songDiffCell = sheet[XLSX.utils.encode_cell({ r: row, c: col - 1 })];
-                            songs.push([songCell.v, songDiffCell.v]);
-                        }
-                    }
-                }
-            }
-        
-            return songs.length > 0 ? songs : null; // Return all matching songs, or null if none are found
-        }
-
-        async function scrape(songs){
+        async function scrape() {
             const guy = interaction.options.getString('guy');
             const browser = await puppeteer.launch({
                 executablePath: '/usr/bin/chromium-browser', // Adjust this path if necessary
                 headless: true,
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
-              });
-            const page = await browser.newPage();
-            await page.goto('https://maimaidx-eng.com');
-            await page.click('.c-button--openid--segaId');
-
+            });
+        
             try {
-                // Wait for the SID input to be clickable and then enter the username
-                await page.waitForSelector('#sid', { visible: true, timeout: 10000 });
-                await page.type('#sid', user); // Replace with your login_user variable
-        
-                // Wait for the password input to be clickable and then enter the password
-                await page.waitForSelector('#password', { visible: true, timeout: 10000 });
-                await page.type('#password', pass); // Replace with your login_pass variable
-        
-            } catch (error) {
-                console.error("Input element not found:", error);
-            }
-        
-            // Wait for the login button to be clickable and then click it
-            await page.waitForSelector('.c-button--login', { visible: true, timeout: 10000 });
-            await page.click('.c-button--login');
-        
-            // Optionally, you can wait for some element that appears after logging in
+                const page = await browser.newPage();
+                await page.goto('https://maimaidx-eng.com');
+                await page.screenshot({ path: 'before_click.png' });
 
-            await page.waitForSelector('.comment_block', { visible: true });
-            const idxMap = {
-                klcc: '4039890368767',
-                yuchen: '6020500221031',
-                marcus: '8071982688053',
-                kok: '8085423055111',
-                yuan: '8070962675681',
-                keyang: '8091021494559',
-                jerry: '6028368715803'
-            };
-            
-            if(guy in idxMap){
-                const idx = idxMap[guy];
-                await page.goto(`https://maimaidx-eng.com/maimai-mobile/friend/friendLevelVs/battleStart/?scoreType=2&level=${calculateLevel(constantValue)}&idx=${idx}`);
-
-                await page.waitForSelector('.footer_banner', { visible: true });
-                for (const [musicName, difficulty] of songs) {
-                    // Determine the correct selector based on difficulty
-                    const blockSelector = difficulty === 'ReMAS' 
-                        ? '.music_remaster_score_back' 
-                        : difficulty === 'MAS' 
-                        ? '.music_master_score_back' 
-                        : null;
-                
-                        const musicBlocks = await page.$$eval(blockSelector, (blocks, difficulty) => {
-                            return blocks.map(block => {
-                                const name = block.querySelector('.music_name_block.t_l.f_13.break')?.textContent.trim();
-                                
-                                // Determine the correct score label class based on difficulty
-                                const scoreLabelClass = difficulty === 'ReMAS' ? '.remaster_score_label' : '.master_score_label';
-                
-                                // Get all score labels
-                                const scoreLabels = block.querySelectorAll(scoreLabelClass);
-                                const scores = Array.from(scoreLabels).map(label => label.textContent.trim());
-                
-                                // Assuming you want the second score
-                                const score = scores[1] || null; // Use the second score if it exists
-                
-                                return { name, score };
-                            });
-                        }, difficulty); // Pass difficulty as an argument
-                
-                        // Check if the music name exists in the page blocks
-                        const found = musicBlocks.find(music => music.name === musicName);
-                        if (found) {
-                            // Add the score to the corresponding song entry
-                            const index = songs.findIndex(song => song[0] === musicName);
-                            if (index !== -1) {
-                                songs[index][2] = found.score; // Update with score
-                            }
-                        }
-                    }
-                    await browser.close();
-                    return songs;
-            } else {
-                
-                await page.goto(`https://maimaidx-eng.com/maimai-mobile/record/musicLevel/search/?level=${calculateLevel(constantValue)}`);
-                
-                await page.waitForSelector('.footer_banner', { visible: true });
-                for (const [musicName, difficulty] of songs) {
-                    // Determine the correct selector based on difficulty
-                    const blockSelector = difficulty === 'ReMAS' 
-                        ? '.music_remaster_score_back' 
-                        : difficulty === 'MAS' 
-                        ? '.music_master_score_back' 
-                        : null;
-                
-                    if (blockSelector) {
-                        // Get all music blocks of the appropriate type
-                        const musicBlocks = await page.$$eval(blockSelector, blocks => {
-                            return blocks.map(block => {
-                                const name = block.querySelector('.music_name_block.t_l.f_13.break')?.textContent.trim();
-                                const score = block.querySelector('.music_score_block.w_112.t_r.f_l.f_12')?.textContent.trim();
-                                return { name, score };
-                            });
-                        });
-                
-                        // Check if the music name exists in the page blocks
-                        const found = musicBlocks.find(music => music.name === musicName);
-                        if (found) {
-                            // Add the score to the corresponding song entry
-                            const index = songs.findIndex(song => song[0] === musicName);
-                            if (index !== -1) {
-                                songs[index][2] = found.score; // Update with score
-                            }
-                        }
-                    }
+                await page.click('.c-button--openid--segaId');
+                await page.screenshot({ path: 'after_click.png' });
+        
+                // Login process
+                try {
+                    await page.waitForSelector('#sid', { visible: true, timeout: 10000 });
+                    await page.type('#sid', user);
+                    await page.waitForSelector('#password', { visible: true, timeout: 10000 });
+                    await page.type('#password', pass);
+                } catch (error) {
+                    console.error("Input element not found:", error);
+                    throw error; // Ensure the error propagates
                 }
+        
+                await page.waitForSelector('.c-button--login', { visible: true, timeout: 10000 });
+                await page.click('.c-button--login');
+                await page.waitForSelector('.comment_block', { visible: true });
+        
+                // Handle user-specific logic
+                const idxMap = {
+                    klcc: '4039890368767',
+                    yuchen: '6020500221031',
+                    marcus: '8071982688053',
+                    kok: '8085423055111',
+                    yuan: '8070962675681',
+                    keyang: '8091021494559',
+                    jerry: '6028368715803'
+                };
+        
+                if (guy in idxMap) {
+                    const idx = idxMap[guy];
+                    await page.goto(`https://maimaidx-eng.com/maimai-mobile/friend/friendLevelVs/battleStart/?scoreType=2&level=${calculateLevel(constantValue)}&idx=${idx}`);
+                    await page.waitForSelector('.footer_banner', { visible: true });
+                    await page.evaluate(() => {
+                        return new Promise((resolve) => {
+                            if (["https://maimaidx.jp", "https://maimaidx-eng.com"].includes(window.location.origin)) {
+                                const script = document.createElement("script");
+                                script.src = "https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=" + Math.floor(Date.now() / 60000);
+                                script.onload = resolve; // Only resolve when script is fully loaded
+                                document.body.appendChild(script);
+                            } else {
+                                resolve();
+                            }
+                        });
+                    });
+                    
+                    if (/^\d+$/.test(constantValue)) {
+                        constantValue = `${constantValue}.0`;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    const songList = await page.$$eval('.music_master_score_back, .music_remaster_score_back', (blocks, constantValue) => {
+                        return blocks
+                            .map(block => {
+                                const musicName = block.querySelector('.music_name_block.t_l.f_13.break')?.textContent.trim() || "Unknown";
+                                const inLvElement = block.querySelector('.music_lv_block.f_r.t_c.f_14');
+                                const difficulty = block.classList.contains('music_remaster_score_back') ? "ReMAS" : "MAS";
+                                const scoreElements = block.querySelectorAll('.w_120.f_b');
+                                const percentage = scoreElements.length > 1 ? scoreElements[1].textContent.trim() : "N/A";
+                    
+                                if (!inLvElement) return null; // Skip if internal level is missing
+                                
+                                const inLv = inLvElement.getAttribute('data-inlv') || "N/A";
+                                if (inLv == constantValue) {
+                                    return [musicName, difficulty, percentage];
+                                }
+                    
+                                return null; // Skip songs that don't match the target internal level
+                            })
+                            .filter(song => song !== null); // Remove null values
+                    }, constantValue);
+                    
+                    return songList;
+                } else {
+                    // Azu
+                    await page.goto(`https://maimaidx-eng.com/maimai-mobile/record/musicLevel/search/?level=${calculateLevel(constantValue)}`);
+                    await page.waitForSelector('.footer_banner', { visible: true });
+
+                    await page.evaluate(() => {
+                        return new Promise((resolve) => {
+                            if (["https://maimaidx.jp", "https://maimaidx-eng.com"].includes(window.location.origin)) {
+                                const script = document.createElement("script");
+                                script.src = "https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=" + Math.floor(Date.now() / 60000);
+                                script.onload = resolve; // Only resolve when script is fully loaded
+                                document.body.appendChild(script);
+                            } else {
+                                resolve();
+                            }
+                        });
+                    });
+                    if (/^\d+$/.test(constantValue)) {
+                        constantValue = `${constantValue}.0`;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    const songList = await page.$$eval('.music_master_score_back, .music_remaster_score_back', (blocks, constantValue) => {
+                        return blocks
+                            .map(block => {
+                                const musicName = block.querySelector('.music_name_block.t_l.f_13.break')?.textContent.trim() || "Unknown";
+                                const inLvElement = block.querySelector('.music_lv_block.f_r.t_c.f_14');
+                                const difficulty = block.classList.contains('music_remaster_score_back') ? "ReMAS" : "MAS";
+                                const percentage = block.querySelector('.music_score_block.w_112.t_r.f_l.f_12')?.textContent.trim() || "N/A";
+
+                                if (!inLvElement) return null; // Skip if internal level is missing
+                                
+                                const inLv = inLvElement.getAttribute('data-inlv') || "N/A";
+
+                                if (inLv == constantValue) {
+                                    return [musicName, difficulty, percentage];
+                                }
+                    
+                                return null; // Skip songs that don't match the target internal level
+                            })
+                            .filter(song => song !== null); // Remove null values
+                    }, constantValue);
+                    
+                    return songList;
+        
+                }
+            } catch (error) {
+                console.error("Error during scrape process:", error);
+                throw error; // Ensure the error propagates
+            } finally {
+                // Ensure browser closes in all cases
                 await browser.close();
-                return songs;
             }
-
-
-
+        
             function calculateLevel(constantValue) {
                 let lvl;
                 const numberValue = parseFloat(constantValue);
@@ -234,7 +210,7 @@ module.exports = {
                   lvl = 21;
                 } else if (numberValue >= 14.6 && numberValue <= 14.9) {
                   lvl = 22;
-                } else if (numberValue === 15.0) {
+                } else if (numberValue == 15.0) {
                   lvl = 23;
                 } else {
                   // Handle other cases or return a default value
