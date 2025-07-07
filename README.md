@@ -1,11 +1,30 @@
-Maimai Top Play Scalp <br>
-A Python script to scrape friend's information on maimai and sends them to a discord channel set everyday.
+# 🎵 Maimai Top Play Scalp
 
-.env format should be like this
-MAIMAI_USER=username
-MAIMAI_PASS=password
-DISCORD_TOKEN=token
-CLIENT_ID=bot_client_id
-GUILD_ID=server_id
-GECKO_PATH="/usr/local/bin/geckodriver"
-MONGO_URI="mongodb://mongodb:27017/mydatabase"
+A Python-based system that scrapes top play and profile information from the **maimai DX website** (for you and your friends) and sends it to a Discord channel daily.
+
+## 📦 Features
+
+- Scrapes logged-in user profile and top plays
+- Injects `mai-tools` analysis scripts for better data
+- Scrapes data from friends’ profiles too
+- Sends all results to a specified Discord channel
+- Runs daily via scheduler
+- Uses Firefox (Selenium) in a Docker container
+
+## 🛠️ Setup
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/admirable0531/maimaiscrape.git
+cd maimaiscrape
+```
+
+### 2. Edit the .env file
+
+### 3. Build and run with Docker Compose
+
+```bash
+docker compose build
+docker compose up -d
+```
