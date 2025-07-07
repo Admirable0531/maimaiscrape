@@ -18,76 +18,79 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 
 def update():
-    # Load variables from .env file
-    load_dotenv()
-
-    # Access variables
-    login_user = os.getenv("MAIMAI_USER")
-    login_pass = os.getenv("MAIMAI_PASS")
-    gecko_path = os.getenv("GECKO_PATH")
-
-    #firefox_binary_path = r"C:\Program Files\Mozilla Firefox\firefox.exe"
-
-    # URL of the website you want to scrape
-    url = "https://maimaidx-eng.com"
-
-    # try:
-    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36"
-    options = Options()
-    options.add_argument("--proxy-server='direct://'")
-    options.add_argument("--proxy-bypass-list=*")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-dev-shm-usage")
-    #options.add_argument("--no-sandbox")
-    #options.add_argument("--proxy-server=")
-    #options.add_argument("blink-settings=imagesEnabled=false")
-    #options.binary_location = firefox_binary_path
-    # options.add_argument("--enable-logging=stderr")
-    # options.add_argument('--log-level=3')
-
-    options.add_argument("--headless")
-# Specify the path to the Chrome WebDriver
-    service = Service(gecko_path)
-    driver = webdriver.Firefox(service=service, options=options)
-
-    # Open the webpage
-    driver.get(url)
-
-    # Find the button by its CSS selector, ID, class, etc.
-    sega_button = driver.find_element(By.CSS_SELECTOR, ".c-button--openid--segaId")
-
-    # Click the button
-    sega_button.click()
-
     try:
-        sid_element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "sid")))
-        sid_element.send_keys(login_user)
-        pass_element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "password")))
-        pass_element.send_keys(login_pass)
+        # Load variables from .env file
+        load_dotenv()
 
-    except NoSuchElementException as e:
-        print("Input element not found.")
+        # Access variables
+        login_user = os.getenv("MAIMAI_USER")
+        login_pass = os.getenv("MAIMAI_PASS")
+        gecko_path = os.getenv("GECKO_PATH")
 
-    login_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".c-button--login")))
+        #firefox_binary_path = r"C:\Program Files\Mozilla Firefox\firefox.exe"
 
-    login_button.click()
+        # URL of the website you want to scrape
+        url = "https://maimaidx-eng.com"
 
-    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
-    print("Done Login")
-    try:
-        script = """
-            (function(d){
-                if(["https://maimaidx.jp","https://maimaidx-eng.com"].indexOf(d.location.origin)>=0){
-                    var s=d.createElement("script");
-                    s.src="https://myjian.github.io/mai-tools/scripts/all-in-one.js?t="+Math.floor(Date.now()/60000);
-                    d.body.append(s);
-                }
-            })(document)
-            """
-        driver.execute_script(script)
+        # try:
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36"
+        options = Options()
+        options.add_argument("--proxy-server='direct://'")
+        options.add_argument("--proxy-bypass-list=*")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-dev-shm-usage")
+        #options.add_argument("--no-sandbox")
+        #options.add_argument("--proxy-server=")
+        #options.add_argument("blink-settings=imagesEnabled=false")
+        #options.binary_location = firefox_binary_path
+        # options.add_argument("--enable-logging=stderr")
+        # options.add_argument('--log-level=3')
+
+        options.add_argument("--headless")
+    # Specify the path to the Chrome WebDriver
+        service = Service(gecko_path)
+        driver = webdriver.Firefox(service=service, options=options)
+
+        # Open the webpage
+        driver.get(url)
+
+        # Find the button by its CSS selector, ID, class, etc.
+        sega_button = driver.find_element(By.CSS_SELECTOR, ".c-button--openid--segaId")
+
+        # Click the button
+        sega_button.click()
+
+        try:
+            sid_element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "sid")))
+            sid_element.send_keys(login_user)
+            pass_element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "password")))
+            pass_element.send_keys(login_pass)
+
+        except NoSuchElementException as e:
+            print("Input element not found.")
+
+        login_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".c-button--login")))
+
+        login_button.click()
+
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
+        print("Done Login")
+        try:
+            script = """
+                (function(d){
+                    if(["https://maimaidx.jp","https://maimaidx-eng.com"].indexOf(d.location.origin)>=0){
+                        var s=d.createElement("script");
+                        s.src="https://myjian.github.io/mai-tools/scripts/all-in-one.js?t="+Math.floor(Date.now()/60000);
+                        d.body.append(s);
+                    }
+                })(document)
+                """
+            driver.execute_script(script)
+        except Exception as e:
+            print(e)
     except Exception as e:
-        print(e)
-
+        print(f"An error occurred: {e}")
+    
     def get_top_score():
         new_rating_elements = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.topRecordTable.songRecordTable')))
         
@@ -242,16 +245,16 @@ def update():
         )
         user_rating = [element.text for element in user_rating_elements]
 
-        for i in range(2, 7):
-            if i == 2:
+        for i in range(3, 8):
+            if i == 3:
                 choose = "yuchen"
-            elif i == 3:
-                choose = "marcus"
             elif i == 4:
-                choose = "kok"
+                choose = "marcus"
             elif i == 5:
-                choose = "yuan"
+                choose = "kok"
             elif i == 6:
+                choose = "yuan"
+            elif i == 7:
                 choose = "keyang"
             else:
                 print("error user")
@@ -272,7 +275,7 @@ def update():
     )
 
 # Yuchen
-    analyze_rating_link = elements[2]
+    analyze_rating_link = elements[3]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     
@@ -281,7 +284,7 @@ def update():
 
 
 # Markus
-    analyze_rating_link = elements[3]
+    analyze_rating_link = elements[4]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["marcus_top"]
@@ -289,7 +292,7 @@ def update():
 
 
 # Kok
-    analyze_rating_link = elements[4]
+    analyze_rating_link = elements[5]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["kok_top"]
@@ -297,7 +300,7 @@ def update():
 
 
 # Yuan
-    analyze_rating_link = elements[5]
+    analyze_rating_link = elements[6]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["yuan_top"]
@@ -305,7 +308,7 @@ def update():
 
 
 # Keyang
-    analyze_rating_link = elements[6]
+    analyze_rating_link = elements[7]
     analyze_rating_link.click()
     driver.switch_to.window(driver.window_handles[1])
     collection = db["keyang_top"]
