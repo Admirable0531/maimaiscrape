@@ -1,0 +1,5 @@
+selenium
+python-dotenv
+pymongo
+schedule
+beautifulsoup4

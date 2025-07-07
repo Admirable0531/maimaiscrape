@@ -27,7 +27,7 @@ module.exports = {
 
         channel.send({ embeds: [exampleEmbed] });
         
-        const uri = 'mongodb://localhost:27017';
+        const uri = 'mongodb://mongodb:27017/mydatabase';
         const dbName = 'mydatabase';
         const users = ["ryan", "jiayi", "marcus", "kok", "yuan", "keyang"]
         const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });

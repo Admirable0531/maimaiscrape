@@ -6,7 +6,7 @@ module.exports = {
 		.setName('topplay')
 		.setDescription('Gets your top play'),
 	async execute(interaction) {
-        const uri = 'mongodb://localhost:27017';
+        const uri = 'mongodb://mongodb:27017/mydatabase';
 
         // Database Name
         const dbName = 'mydatabase';

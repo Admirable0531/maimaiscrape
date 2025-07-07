@@ -157,7 +157,7 @@ def update():
         
 
     
-    CONNECTION_STRING = "mongodb://localhost:27017/"
+    CONNECTION_STRING = "mongodb://mongodb:27017/"
     client = MongoClient(CONNECTION_STRING)
     db = client["mydatabase"]
     current_date = datetime.date.today()

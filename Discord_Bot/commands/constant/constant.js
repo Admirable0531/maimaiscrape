@@ -1,6 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { EmbedBuilder  } = require('discord.js');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const user = process.env.MAIMAI_USER;
@@ -68,13 +70,20 @@ module.exports = {
         async function scrape() {
             const guy = interaction.options.getString('guy');
             const browser = await puppeteer.launch({
-                executablePath: '/usr/bin/chromium-browser', // Adjust this path if necessary
+                
+                executablePath: '/usr/bin/chromium', // Adjust this path if necessary
                 headless: true,
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
         
             try {
                 const page = await browser.newPage();
+                await page.setUserAgent(
+                    "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36"
+                );
+                await page.setExtraHTTPHeaders({
+                    'Accept-Language': 'en-US,en;q=0.9'
+                });
                 await page.goto('https://maimaidx-eng.com');
                 await page.screenshot({ path: 'before_click.png' });
 

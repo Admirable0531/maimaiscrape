@@ -21,7 +21,7 @@ module.exports = {
 
         channel.send({ embeds: [exampleEmbed] });
         
-        const uri = 'mongodb://localhost:27017';
+        const uri = 'mongodb://mongodb:27017/mydatabase';
         const dbName = 'mydatabase';
         // 
         const users = ["ryan", "yuchen", "marcus", "kok", "yuan", "keyang"]
