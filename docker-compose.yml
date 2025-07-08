@@ -13,6 +13,8 @@ services:
     command: node .
     depends_on:
       - mongodb
+    environment:
+      - TZ=Asia/Kuala_Lumpur
   mongodb:
     image: mongo:4.4.18
     container_name: mongodb
@@ -20,6 +22,8 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    environment:
+      - TZ=Asia/Kuala_Lumpur
   scraper:
     build:
       context: .
@@ -28,6 +32,8 @@ services:
       - mongodb
     env_file:
       - .env
+    environment:
+      - TZ=Asia/Kuala_Lumpur
 
 volumes:
   mongodb_data:
