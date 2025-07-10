@@ -69,14 +69,15 @@ module.exports = {
 
         async function scrape() {
             const guy = interaction.options.getString('guy');
-            const browser = await puppeteer.launch({
-                
-                executablePath: '/usr/bin/chromium', // Adjust this path if necessary
-                headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
-        
+            
             try {
+                const browser = await puppeteer.launch({
+                    
+                    executablePath: '/usr/bin/chromium', // Adjust this path if necessary
+                    headless: true,
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                });
+        
                 const page = await browser.newPage();
                 await page.setUserAgent(
                     "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36"
@@ -84,11 +85,6 @@ module.exports = {
                 await page.setExtraHTTPHeaders({
                     'Accept-Language': 'en-US,en;q=0.9'
                 });
-                await page.goto('https://maimaidx-eng.com');
-                await page.screenshot({ path: 'before_click.png' });
-
-                await page.click('.c-button--openid--segaId');
-                await page.screenshot({ path: 'after_click.png' });
         
                 // Login process
                 try {
@@ -208,8 +204,13 @@ module.exports = {
                 console.error("Error during scrape process:", error);
                 throw error; // Ensure the error propagates
             } finally {
-                // Ensure browser closes in all cases
-                await browser.close();
+                if (browser) {
+                    try {
+                        await browser.close();
+                    } catch (e) {
+                        console.error("Failed to close browser cleanly:", e);
+                    }
+                }
             }
         
             function calculateLevel(constantValue) {

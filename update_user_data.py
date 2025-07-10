@@ -314,7 +314,7 @@ def update():
     collection = db["keyang_top"]
     collection.insert_one(get_top_score())
     print("DONE")
-    driver.close()
+    driver.quit()
 
 
     # except Exception as e:
