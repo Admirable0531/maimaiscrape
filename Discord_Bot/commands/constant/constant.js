@@ -69,31 +69,42 @@ module.exports = {
 
         async function scrape() {
             const guy = interaction.options.getString('guy');
-            
+            const browser = await puppeteer.launch({
+                executablePath: '/usr/bin/chromium',
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--single-process',
+                    '--no-zygote',
+                    '--disable-accelerated-2d-canvas',
+                    '--disable-software-rasterizer'
+                ],
+                timeout: 60000
+            });
             try {
-                const browser = await puppeteer.launch({
-                    
-                    executablePath: '/usr/bin/chromium', // Adjust this path if necessary
-                    headless: true,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox']
-                });
         
                 const page = await browser.newPage();
-                await page.setUserAgent(
-                    "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36"
-                );
-                await page.setExtraHTTPHeaders({
-                    'Accept-Language': 'en-US,en;q=0.9'
-                });
+                await page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36");
+                await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+                await page.setDefaultNavigationTimeout(60000);
         
                 // Login process
                 try {
+                    console.log("0")
+                    await new Promise(resolve => setTimeout(resolve, 40000));
+                    await page.goto('https://maimaidx-eng.com');
+                    await page.click('.c-button--openid--segaId');
+                    await page.screenshot({ path: 'after_click.png' });
                     await page.waitForSelector('#sid', { visible: true, timeout: 10000 });
                     await page.type('#sid', user);
                     await page.waitForSelector('#password', { visible: true, timeout: 10000 });
                     await page.type('#password', pass);
                 } catch (error) {
                     console.error("Input element not found:", error);
+                    await browser.close();
                     throw error; // Ensure the error propagates
                 }
         
@@ -202,8 +213,10 @@ module.exports = {
                 }
             } catch (error) {
                 console.error("Error during scrape process:", error);
+                await browser.close();
                 throw error; // Ensure the error propagates
             } finally {
+                await browser.close();
                 if (browser) {
                     try {
                         await browser.close();
