@@ -51,7 +51,10 @@ def update():
         service = Service(gecko_path)
         driver = webdriver.Firefox(service=service, options=options)
 
+        
         # Open the webpage
+
+        
         driver.get(url)
 
         # Find the button by its CSS selector, ID, class, etc.
@@ -61,9 +64,9 @@ def update():
         sega_button.click()
 
         try:
-            sid_element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "sid")))
+            sid_element = WebDriverWait(driver, 100).until(EC.element_to_be_clickable((By.ID, "sid")))
             sid_element.send_keys(login_user)
-            pass_element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "password")))
+            pass_element = WebDriverWait(driver, 100).until(EC.element_to_be_clickable((By.ID, "password")))
             pass_element.send_keys(login_pass)
 
         except NoSuchElementException as e:
