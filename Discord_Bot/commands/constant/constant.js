@@ -86,6 +86,7 @@ module.exports = {
             });
             try {
         
+    
                 const page = await browser.newPage();
                 await page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36");
                 await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
@@ -96,6 +97,8 @@ module.exports = {
                     console.log("0")
                     await new Promise(resolve => setTimeout(resolve, 40000));
                     await page.goto('https://maimaidx-eng.com');
+                    await page.waitForSelector('#agree', { visible: true, timeout: 10000 });
+                    await page.click('.c-form__checkbox');
                     await page.click('.c-button--openid--segaId');
                     await page.screenshot({ path: 'after_click.png' });
                     await page.waitForSelector('#sid', { visible: true, timeout: 10000 });

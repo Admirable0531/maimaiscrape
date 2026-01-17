@@ -1,5 +1,6 @@
-selenium
-python-dotenv
+selenium>=4.8.0
 pymongo
-schedule
+python-dotenv
 beautifulsoup4
+pyvirtualdisplay
+schedule

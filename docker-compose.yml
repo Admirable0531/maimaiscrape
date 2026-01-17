@@ -10,11 +10,18 @@ services:
     volumes:
       - ./Discord_Bot:/app
     working_dir: /app
-    command: node .
+    command: ["node", "."]
     depends_on:
       - mongodb
+    restart: unless-stopped
     environment:
       - TZ=Asia/Kuala_Lumpur
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   mongodb:
     image: mongo:4.4.18
     container_name: mongodb
@@ -24,6 +31,19 @@ services:
       - mongodb_data:/data/db
     environment:
       - TZ=Asia/Kuala_Lumpur
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mongo --quiet --eval 'db.adminCommand(\"ping\")' >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   scraper:
     build:
       context: .
@@ -34,7 +54,18 @@ services:
       - .env
     environment:
       - TZ=Asia/Kuala_Lumpur
-  
+      - USE_XVFB=1
+    volumes:
+      - ./screenshots:/app/screenshots
+      - /dev/shm:/dev/shm
+    working_dir: /app
+    command: ["python", "-u", "/app/update_user_data.py"]
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   mongodb_data:
