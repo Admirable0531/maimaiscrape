@@ -5,14 +5,8 @@ module.exports = {
         .setName('update')
         .setDescription('Get scores update'),
     async execute(interaction) {
-        async function test() {
-            const anotherFile = require('./scripts/update_score.js');
-            const channel = await client.channels.fetch("1233678655717118022");
-            
+        const updateScore = require('../../scripts/update_score.js');
+        await updateScore.execute(interaction.channel);
 
-            await anotherFile.execute(channel);
-        }
-
-        test();
     }
-}
+};
