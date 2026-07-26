@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const config = require('../../config');
 const dailyPipeline = require('../../scripts/daily_pipeline');
 
 const STEP_CHOICES = [
@@ -9,8 +10,8 @@ const STEP_CHOICES = [
 
 const STEP_SETS = {
     all: null, // null = every step
-    scrape: ['scrape-top-scores', 'scrape-friend-list'],
-    post: ['post-score-update', 'post-friend-leaderboard'],
+    scrape: ['scrape-top-scores', 'scrape-friend-list-fy', 'scrape-friend-list-main'],
+    post: ['post-score-update', 'post-fy-leaderboard', 'post-main-leaderboard'],
 };
 
 module.exports = {
@@ -26,15 +27,22 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        // The scrape can take tens of minutes, far beyond the 15-minute window an
-        // interaction token stays valid, so acknowledge and report via the channel.
+        // Mirrors the scheduled run: each report posts to its real destination
+        // (score channel, FY webhook, main leaderboard channel), not wherever
+        // this command was typed — so a manual /daily and the 22:45 cron are
+        // never inconsistent about where things end up.
         await interaction.reply({
-            content: 'Starting the daily update. Progress is posted in this channel; details are in the bot logs.',
+            content: 'Starting the daily update — results post to their usual channels. Summary follows here.',
             flags: MessageFlags.Ephemeral,
         });
 
+        const scoreChannel = await interaction.client.channels.fetch(config.dailyScoreChannelID);
+        const mainLeaderboardChannel = config.mainLeaderboardChannelID
+            ? await interaction.client.channels.fetch(config.mainLeaderboardChannelID).catch(() => null)
+            : null;
+
         const steps = STEP_SETS[interaction.options.getString('steps') || 'all'];
-        const result = await dailyPipeline.run({ channel: interaction.channel, steps });
+        const result = await dailyPipeline.run({ scoreChannel, mainLeaderboardChannel, steps });
 
         const summary = result.results
             .map((r) => `${r.ok ? '✅' : '❌'} \`${r.name}\` — ${r.detail} (${r.seconds}s)`)

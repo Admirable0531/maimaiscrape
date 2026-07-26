@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
+const config = require('../config');
 const friendsWebhook = require('./friends_webhook');
 const updateFriendRatings = require('./update_friend_ratings');
 
@@ -11,13 +12,20 @@ const SCRAPE_TIMEOUT_MS = parseInt(process.env.SCRAPE_TIMEOUT_MINUTES || '45', 1
  * The ordered daily run.
  *
  * Previously two schedules raced: the scraper container scraped at 22:45 and the
- * bot posted at 23:00, assuming the scrape finished inside 15 minutes. If it ran
- * long or failed, the bot posted stale data (or nothing) with no indication why.
- * Nothing scheduled the friend-list scrape at all, so the friend leaderboard
- * compare always failed for want of a snapshot.
+ * bot posted at 23:00, assuming the scrape finished inside 15 minutes. Nothing
+ * scheduled the friend-list scrape at all, so the friend leaderboard compare
+ * always failed for want of a snapshot. And every report was routed through one
+ * channel, when in fact each report has its own destination:
  *
- * Now one scheduler runs the steps in sequence, each awaited, each failure
- * isolated and reported.
+ *   scrape-top-scores        -> writes ryan_top / friend_<idx>_top / user_info
+ *   scrape-friend-list-fy    -> writes friend_rating_daily_snapshots
+ *   scrape-friend-list-main  -> writes friend_rating_daily_snapshots_main
+ *   post-score-update        -> scoreChannel            (dailyScoreChannelID)
+ *   post-fy-leaderboard      -> FRIEND_WEBHOOK_URL_FY    (webhook)
+ *   post-main-leaderboard    -> mainLeaderboardChannel   (mainLeaderboardChannelID)
+ *
+ * Every step is awaited and isolated: one failure is reported but the
+ * remaining steps still run, since they don't depend on each other's success.
  */
 
 /** POSTs to the express api, failing loudly rather than hanging forever. */
@@ -31,9 +39,7 @@ async function callApi(endpoint, { timeoutMs = SCRAPE_TIMEOUT_MS, body } = {}) {
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || !payload.success) {
-        throw new Error(
-            `${endpoint} returned ${response.status}${payload.error ? `: ${payload.error}` : ''}`
-        );
+        throw new Error(`${endpoint} returned ${response.status}${payload.error ? `: ${payload.error}` : ''}`);
     }
     return payload;
 }
@@ -50,7 +56,7 @@ async function postMessages(channel, messages) {
 }
 
 /**
- * Step 1 — scrape top scores and profiles for Ryan and every friend.
+ * Step — scrape top scores and profiles for Ryan and every friend.
  * Writes ryan_top / friend_<idx>_top / user_info.
  */
 async function scrapeTopScores() {
@@ -59,44 +65,63 @@ async function scrapeTopScores() {
 }
 
 /**
- * Step 2 — scrape the friend list ratings snapshot.
- * Writes one friend_rating_daily_snapshots document for today.
+ * Step — scrape one account's friend list ratings snapshot.
+ * accountType 'fy' writes friend_rating_daily_snapshots;
+ * 'main' writes friend_rating_daily_snapshots_main.
  */
-async function scrapeFriendList() {
-    const result = await friendsWebhook.run({ sendWebhook: false, saveToMongo: true, accountType: 'fy' });
-    if (!result.ok) throw new Error(result.error || 'friend list scrape failed');
-    return `${result.friendsCount} friend ratings saved`;
+async function scrapeFriendList(accountType) {
+    const result = await friendsWebhook.run({ sendWebhook: false, saveToMongo: true, accountType });
+    if (!result.ok) throw new Error(result.error || `${accountType} friend list scrape failed`);
+    return `${result.friendsCount} friend ratings saved (${accountType})`;
 }
 
-/** Step 3 — post the per-user score diff versus the previous day. */
-async function postScoreUpdate(channel) {
+/** Step — post the per-user score diff versus the previous day, to scoreChannel. */
+async function postScoreUpdate(scoreChannel) {
     const { messages = [] } = await callApi('/run-update-score', { timeoutMs: 5 * 60 * 1000 });
-    await postMessages(channel, messages);
+    await postMessages(scoreChannel, messages);
     return `${messages.length} score message(s) posted`;
 }
 
-/** Step 4 — post the friend rating leaderboard with day-over-day movement. */
-async function postFriendLeaderboard(channel) {
-    const result = await updateFriendRatings.execute({ channel, webhookUrl: '' });
-    if (!result.ok) throw new Error(result.reason || 'friend leaderboard failed');
+/** Step — post the FY friend rating leaderboard to its dedicated webhook. */
+async function postFyLeaderboard() {
+    if (!config.FRIEND_WEBHOOK_URL_FY) {
+        return 'skipped (FRIEND_WEBHOOK_URL_FY not set)';
+    }
+    const result = await updateFriendRatings.execute({
+        webhookUrl: config.FRIEND_WEBHOOK_URL_FY,
+        accountType: 'fy',
+    });
+    if (!result.ok) throw new Error(result.reason || 'FY leaderboard failed');
+    return `leaderboard posted for ${result.friendsCount} friends`;
+}
+
+/** Step — post the main-account friend rating leaderboard to its channel. */
+async function postMainLeaderboard(mainLeaderboardChannel) {
+    if (!mainLeaderboardChannel) {
+        return 'skipped (MAIN_LEADERBOARD_CHANNEL_ID not set)';
+    }
+    const result = await updateFriendRatings.execute({ channel: mainLeaderboardChannel, accountType: 'main' });
+    if (!result.ok) throw new Error(result.reason || 'main leaderboard failed');
     return `leaderboard posted for ${result.friendsCount} friends`;
 }
 
 /**
- * Runs the four steps in order.
+ * Runs the daily steps in order.
  *
- * A failed step is recorded and the run continues, because the later steps are
- * still useful on their own — a failed friend-list scrape shouldn't suppress the
- * score post. The channel gets a summary only when something went wrong.
+ * `scoreChannel` is required (the score-diff post always needs somewhere to
+ * go). `mainLeaderboardChannel` is optional — until MAIN_LEADERBOARD_CHANNEL_ID
+ * is configured, that step logs as skipped rather than failing every night.
  */
-async function run({ channel, steps: only } = {}) {
-    if (!channel) throw new Error('daily pipeline requires a channel');
+async function run({ scoreChannel, mainLeaderboardChannel = null, steps: only } = {}) {
+    if (!scoreChannel) throw new Error('daily pipeline requires a scoreChannel');
 
     const steps = [
         { name: 'scrape-top-scores', run: () => scrapeTopScores() },
-        { name: 'scrape-friend-list', run: () => scrapeFriendList() },
-        { name: 'post-score-update', run: () => postScoreUpdate(channel) },
-        { name: 'post-friend-leaderboard', run: () => postFriendLeaderboard(channel) },
+        { name: 'scrape-friend-list-fy', run: () => scrapeFriendList('fy') },
+        { name: 'scrape-friend-list-main', run: () => scrapeFriendList('main') },
+        { name: 'post-score-update', run: () => postScoreUpdate(scoreChannel) },
+        { name: 'post-fy-leaderboard', run: () => postFyLeaderboard() },
+        { name: 'post-main-leaderboard', run: () => postMainLeaderboard(mainLeaderboardChannel) },
     ].filter((step) => !only || only.includes(step.name));
 
     const started = Date.now();
@@ -127,12 +152,13 @@ async function run({ channel, steps: only } = {}) {
             .setColor(0xff0000)
             .setTitle('⚠️ Daily update had problems')
             .setDescription(
-                results
-                    .map((r) => `${r.ok ? '✅' : '❌'} \`${r.name}\` — ${r.detail} _(${r.seconds}s)_`)
-                    .join('\n')
+                results.map((r) => `${r.ok ? '✅' : '❌'} \`${r.name}\` — ${r.detail} _(${r.seconds}s)_`).join('\n')
             )
             .setFooter({ text: `Total ${totalSeconds}s • ${new Date().toLocaleString()}` });
-        await channel.send({ embeds: [embed] }).catch((err) => {
+        // The summary always goes to scoreChannel: it's the one destination
+        // guaranteed to exist, and every failure is relevant context there
+        // regardless of which report it was for.
+        await scoreChannel.send({ embeds: [embed] }).catch((err) => {
             console.error(`[${LABEL}] could not post failure summary:`, err.message);
         });
     }

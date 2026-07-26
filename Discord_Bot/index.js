@@ -116,11 +116,27 @@ function scheduleJob(name, timeOfDay, fallbackTime, job) {
     console.log(`[bot] scheduled ${name} at ${timeOfDay} ${TIMEZONE} (cron: ${expression})`);
 }
 
-async function getDailyChannel() {
-    const channel = await client.channels.fetch(config.dailyScoreChannelID);
-    if (!channel) throw new Error(`channel ${config.dailyScoreChannelID} not found`);
-    if (!channel.isTextBased()) throw new Error(`channel ${config.dailyScoreChannelID} is not text based`);
+/** Fetches a required text channel by id, failing loudly if it's missing or wrong-typed. */
+async function getRequiredChannel(channelId, label) {
+    const channel = await client.channels.fetch(channelId);
+    if (!channel) throw new Error(`${label} channel ${channelId} not found`);
+    if (!channel.isTextBased()) throw new Error(`${label} channel ${channelId} is not text based`);
     return channel;
+}
+
+/**
+ * mainLeaderboardChannelID is optional (unset until configured), so a missing
+ * or bad id logs a warning and disables that one report instead of blocking
+ * the score-diff and FY leaderboard, which don't depend on it.
+ */
+async function getOptionalChannel(channelId, label) {
+    if (!channelId) return null;
+    try {
+        return await getRequiredChannel(channelId, label);
+    } catch (err) {
+        console.warn(`[bot] ${label}: ${err.message} — that report will be skipped`);
+        return null;
+    }
 }
 
 /**
@@ -133,8 +149,12 @@ client.once(Events.ClientReady, (readyClient) => {
 
     if (DAILY_PIPELINE_ENABLED) {
         scheduleJob('daily-pipeline', DAILY_PIPELINE_AT, '22:45', async () => {
-            const channel = await getDailyChannel();
-            await dailyPipeline.run({ channel });
+            const scoreChannel = await getRequiredChannel(config.dailyScoreChannelID, 'daily score');
+            const mainLeaderboardChannel = await getOptionalChannel(
+                config.mainLeaderboardChannelID,
+                'main leaderboard'
+            );
+            await dailyPipeline.run({ scoreChannel, mainLeaderboardChannel });
         });
     } else {
         console.log('[bot] DAILY_PIPELINE_ENABLED=false — daily scrape/post disabled; use /scraper and /update.');

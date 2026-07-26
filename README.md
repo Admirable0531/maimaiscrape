@@ -17,15 +17,21 @@ stores them in MongoDB, and posts daily reports to Discord.
 
 One scheduler (the bot) runs everything in order, so scraping can never race posting.
 
-**`DAILY_PIPELINE_AT` (default 22:45)** — the daily pipeline, four sequential steps:
+**`DAILY_PIPELINE_AT` (default 22:45)** — the daily pipeline, six sequential steps,
+each posting to its own destination:
 
-1. `scrape-top-scores` — POSTs `/run-update-user-data`; writes `ryan_top`, `friend_<idx>_top`, `user_info`
-2. `scrape-friend-list` — scrapes friend ratings into `friend_rating_daily_snapshots`
-3. `post-score-update` — posts each user's new/improved charts vs the previous day
-4. `post-friend-leaderboard` — posts the friend rating leaderboard with day-over-day movement
+| Step | Writes / posts to |
+|------|--------------------|
+| `scrape-top-scores` | POSTs `/run-update-user-data`; writes `ryan_top`, `friend_<idx>_top`, `user_info` |
+| `scrape-friend-list-fy` | scrapes the FY account's friends; writes `friend_rating_daily_snapshots` |
+| `scrape-friend-list-main` | scrapes the main account's friends; writes `friend_rating_daily_snapshots_main` |
+| `post-score-update` | posts each user's new/improved charts vs the previous day, to **`DAILY_SCORE_CHANNEL_ID`** |
+| `post-fy-leaderboard` | posts the FY friend leaderboard, to **`FRIEND_WEBHOOK_URL_FY`** |
+| `post-main-leaderboard` | posts the main-account friend leaderboard, to **`MAIN_LEADERBOARD_CHANNEL_ID`** |
 
-Each step is awaited and isolated: one failure is reported to the channel but the
-remaining steps still run.
+Each step is awaited and isolated: one failure is reported (to `DAILY_SCORE_CHANNEL_ID`)
+but the remaining steps still run. `post-fy-leaderboard` and `post-main-leaderboard`
+report as skipped rather than failed when their destination isn't configured.
 
 **`CIRCLE_RUN_AT` (default 06:30)** — after maimai's maintenance window:
 scrapes the top-100 circle rankings into `circle_rankings`, then posts the daily
@@ -73,6 +79,9 @@ variable is missing. See `.env.example` for the full list.
 Required: `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, `MAIMAI_USER`, `MAIMAI_PASS`,
 `MAIMAI_ACCOUNT_RATING_FY`, `MAIMAI_PASSWORD_RATING`, `FRIEND_WEBHOOK_URL_FY`,
 `CIRCLE_WEBHOOK_URL`.
+
+Optional: `MAIN_LEADERBOARD_CHANNEL_ID` — until set, `post-main-leaderboard`
+reports as skipped every night instead of failing.
 
 ## 🗄️ Collections
 
