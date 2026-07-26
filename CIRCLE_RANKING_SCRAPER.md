@@ -1,123 +1,104 @@
 # Circle Ranking Scraper
 
-This scraper collects the top 100 circle rankings from the maimai DX NET circle ranking page.
-
-## Features
-
-- **Automated Scraping**: Runs every 30 minutes via cron job
-- **Smart Scheduling**: Avoids maintenance hours (3-6 AM JST) and problematic minutes (:25, :55)
-- **Maintenance Detection**: Automatically detects and handles maintenance periods
-- **MongoDB Storage**: Saves daily snapshots of rankings to `circle_rankings` collection
-- **Discord Integration**: Sends formatted rankings to Discord webhook
-- **Manual Commands**: Discord slash commands for manual triggering and viewing
+Collects the top 100 circle rankings from the maimai DX NET circle ranking page.
 
 ## Files
 
-- `Discord_Bot/scripts/circle_ranking_scraper.js` - Main scraper script
-- `Discord_Bot/commands/scraper/circle.js` - Manual trigger command
-- `Discord_Bot/commands/latestcirclerankings/latestcirclerankings.js` - View latest rankings command
-- `test_circle_scraper.js` - Test script
+- `Discord_Bot/scripts/circle_ranking_scraper.js` — the scraper
+- `Discord_Bot/scripts/daily_points_tracker.js` — points-gain report over stored snapshots
+- `Discord_Bot/commands/scraper/circle.js` — `/circle` manual trigger
+- `Discord_Bot/commands/scraper/dailypoints.js` — `/dailypoints` manual report
+- `Discord_Bot/commands/latestcirclerankings/latestcirclerankings.js` — `/latestcirclerankings`
 
-## Configuration
-
-The scraper uses the following config values from `Discord_Bot/config.js`:
-
-- `MAIMAI_ACCOUNT_RATING_FY` - Username for login (as requested)
-- `MAIMAI_PASSWORD_RATING` - Password for login
-- `FRIEND_WEBHOOK_URL_FY` - Discord webhook URL for posting results
-- `MONGO_URI` - MongoDB connection string
+Login, browser setup and error-page handling are shared with the friend-list
+scraper via `Discord_Bot/lib/maimai_session.js`.
 
 ## Scheduling
 
-The scraper runs automatically with the following schedule:
+**Once per day**, at `CIRCLE_RUN_AT` (default `06:30`, container timezone
+`Asia/Kuala_Lumpur`) — after maimai's usual 03:00–06:00 maintenance window.
 
-- **Normal Hours**: Every 30 minutes at :00 and :30
-- **Maintenance Hours**: 3:00 AM - 6:00 AM MYT (Malaysia Time, UTC+8)
-  - **2:55 AM MYT**: Special run before maintenance starts (instead of 3:00 AM)
-  - **6:05 AM MYT**: Special run after maintenance ends (instead of 6:00 AM)
-  - **During maintenance**: All other times are skipped
-- **Timezone**: Uses MYT (Malaysia Time, UTC+8) for maintenance window calculation
+The daily points-gain report runs immediately afterwards in the same job, so it
+always compares the two newest snapshots.
 
-## Data Structure
+> Earlier revisions of this document described a 30-minute cadence with special
+> runs at 02:55 and 06:05. That was never implemented; the schedule has always
+> been a single daily run. If you do want a higher cadence, add a second
+> `scheduleJob(...)` call in `Discord_Bot/index.js` — `daily_points_tracker.js`
+> already handles multiple same-day snapshots (it then measures first→last within
+> the day instead of day-over-day).
 
-### MongoDB Collection: `circle_rankings`
+## Configuration
+
+From `Discord_Bot/config.js`, all sourced from `.env`:
+
+- `MAIMAI_ACCOUNT_RATING_FY` — Sega ID used to log in
+- `MAIMAI_PASSWORD_RATING` — password
+- `CIRCLE_WEBHOOK_URL` — Discord webhook for the report
+- `MONGO_URI` — MongoDB connection string
+- `CIRCLE_RUN_AT` — daily run time (`HH:MM`)
+
+## Data
+
+Collection `circle_rankings`, one document per scrape, pruned after 7 days:
 
 ```javascript
 {
-  snapshotDate: "2026-04-02",        // UTC date string
+  snapshotDate: "2026-07-26",   // UTC calendar day
   rankings: [
-    {
-      rank: 1,                       // Position in ranking
-      groupName: "ＬＣω",            // Circle/group name
-      points: 4829,                  // Numeric points value
-      pointsText: "4829 PT"         // Original text from page
-    },
-    // ... up to 100 rankings
+    { rank: 1, groupName: "ＬＣω", points: 4829, pointsText: "4829 PT" },
+    // … up to 100
   ],
-  scrapedAt: ISODate("2026-04-02T10:30:00Z")
+  scrapedAt: ISODate("2026-07-26T22:30:00Z"),
+  timestamp: 1785105000000
 }
 ```
 
-## Discord Commands
+`rank` is assigned from the page's document order after sorting by points, so the
+stored rank always matches the rank shown in Discord.
+
+## Commands
 
 ### `/circle`
-Manually trigger the circle ranking scraper.
+Runs the scraper on demand.
 
-Options:
-- `webhook` (boolean): Send results to webhook (default: false for manual runs)
-- `save` (boolean): Save to MongoDB (default: true)
+- `webhook` — `auto` (post only if something changed), `force` (always post),
+  `none` (never post). Default `none`.
+- `save` — write the snapshot to MongoDB. Default `true`.
+
+`none` genuinely suppresses the post now; previously an explicit "no webhook"
+still posted whenever changes were detected.
 
 ### `/latestcirclerankings`
-View the latest circle rankings from the database.
+Shows the latest stored rankings. `limit` defaults to 20, max 100.
 
-Options:
-- `limit` (integer): Number of rankings to show (default: 20, max: 100)
+### `/dailypoints`
+Points-gain report. `date` (`YYYY-MM-DD`) defaults to the newest stored snapshot
+date. `webhook` defaults to `false` for manual runs.
 
-## Testing
+## Behaviour notes
 
-Run the test script to verify the scraper works:
+- **Comparison baseline** is the most recent stored snapshot, read *before* the
+  current scrape is saved. (It previously read the second-most-recent, so the
+  arrows and point deltas described a comparison one run older than claimed.)
+- **Maintenance detection** requires both the absence of a ranking table and
+  maintenance wording on the page. Matching the word "maintenance" anywhere in the
+  HTML — as the old check did — aborted healthy scrapes whenever an unrelated
+  footer link mentioned it.
+- **Embed limits** are enforced for both the 10-embeds and 6000-characters-per-message
+  caps, so a full top-100 post can't be rejected by Discord.
+- **Circles that drop out** of the top 100 are reported as dropped, not as having
+  lost all their points.
+
+## Debugging
 
 ```bash
-node test_circle_scraper.js
+# one-off run, no Discord post
+docker compose exec bot node Discord_Bot/scripts/circle_ranking_scraper.js
+
+# with screenshots (written to ./screenshots via the api service's volume)
+docker compose exec -e SCREENSHOT_DEBUG=1 api node Discord_Bot/scripts/circle_ranking_scraper.js
 ```
 
-For debugging, set these environment variables:
-- `HEADLESS=false` - Show browser window
-- `SCREENSHOT_DEBUG=true` - Save screenshots during scraping
-
-## Error Handling
-
-The scraper handles several error conditions:
-
-1. **Maintenance Mode**: Detects maintenance pages and skips scraping
-2. **Login Failures**: Retries with different user agents
-3. **Network Issues**: Timeout handling and retry logic  
-4. **Page Structure Changes**: Graceful degradation if elements not found
-5. **Discord Webhook Failures**: Logs errors but continues operation
-
-## Webhook Format
-
-Results are sent to Discord as embeds with:
-- Title: "Circle Rankings - Top 100"
-- Color-coded status (blue for success, red for errors, orange for maintenance)
-- Formatted ranking list with group names and points
-- Footer with total count and timestamp
-- Multiple embeds if needed to fit all rankings
-
-## Maintenance Window
-
-The scraper automatically handles maimai maintenance periods:
-- **Scheduled**: 3:00 AM - 6:00 AM MYT (daily maintenance window)
-  - **2:55 AM MYT**: Runs before maintenance starts
-  - **6:05 AM MYT**: Runs after maintenance ends
-  - **3:00 AM - 6:00 AM MYT**: All regular runs are skipped
-- **Unscheduled**: Detected by page content analysis
-- **Behavior**: Adjusts timing and optionally notifies via webhook
-
-## Integration
-
-The circle ranking scraper integrates with the existing Discord bot infrastructure:
-- Uses same login credentials and browser configuration
-- Follows same error handling and screenshot patterns
-- Shares MongoDB connection and webhook utilities
-- Consistent logging and debugging approach
+- `HEADLESS=false` — show the browser window
+- `SCREENSHOT_DEBUG=1` — save a screenshot at each login/scrape step

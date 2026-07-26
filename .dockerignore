@@ -1,0 +1,26 @@
+# The build context is the repository root, so this file governs every image.
+# Without it, a locally installed node_modules gets copied into the image and
+# shadows the one npm install builds there — which breaks on the Pi, because
+# host-installed native modules (puppeteer, mongodb) are the wrong architecture.
+node_modules
+**/node_modules
+
+.git
+.github
+.env
+.env.*
+!.env.example
+
+screenshots
+*.png
+*.csv
+nohup.out
+npm-debug.log*
+
+# Python legacy scraper (superseded by server/update_user_data.js)
+__pycache__
+*.pyc
+venv
+
+web/dist
+web/.vite

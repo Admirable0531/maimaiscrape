@@ -5,7 +5,6 @@ const { MongoClient } = require('mongodb');
 require('dotenv').config();
 const { getTopCollectionName } = require('./collectionNames');
 
-const FRIEND_CONCURRENCY = parseInt(process.env.FRIEND_CONCURRENCY || '3', 10);
 const HEADLESS = process.env.HEADLESS !== 'false' && process.env.HEADLESS !== '0';
 const SCREENSHOT_DEBUG = process.env.SCREENSHOT_DEBUG === '1' || process.env.SCREENSHOT_DEBUG === 'true';
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR || path.join(process.cwd(), 'screenshots');
@@ -258,10 +257,13 @@ async function updateUserData() {
     if (SCREENSHOT_DEBUG) console.log('[update] Screenshot debug on: saving to', SCREENSHOT_DIR);
 
     console.log('[update] starting update');
-    let browser = null;
     for (let attemptIdx = 0; attemptIdx < attempts.length; attemptIdx++) {
         const ua = attempts[attemptIdx];
         console.log(`[attempt ${attemptIdx + 1}] using UA: ${ua}`);
+        // Declared per attempt and closed in `finally`, so a throw can't leak
+        // either the browser or the Mongo connection.
+        let browser = null;
+        let client = null;
         try {
             browser = await puppeteer.launch({
                 headless: HEADLESS,
@@ -270,7 +272,7 @@ async function updateUserData() {
                 ...(executablePath ? { executablePath } : {}),
             });
             const page = await browser.newPage();
-            if (HEADLESS) page.setViewport({ width: 1280, height: 1024 });
+            if (HEADLESS) await page.setViewport({ width: 1280, height: 1024 });
             await page.setUserAgent(ua);
             await page.setExtraHTTPHeaders({ 'accept-language': 'en-US,en;q=0.9' });
 
@@ -308,12 +310,7 @@ async function updateUserData() {
 
             if (await isErrorPage(page)) {
                 console.log(`[attempt ${attemptIdx + 1}] server returned ERROR page after login; retrying`);
-                try {
-                    await page.close();
-                } catch (e) {}
-                await browser.close();
-                browser = null;
-                continue; // try next UA
+                continue; // cleanup happens in `finally`
             }
 
             // inject helper script (best-effort)
@@ -329,10 +326,16 @@ async function updateUserData() {
 
             // Mongo setup
             const CONNECTION_STRING = process.env.MONGO_URI || 'mongodb://mongodb:27017/';
-            const client = new MongoClient(CONNECTION_STRING);
+            client = new MongoClient(CONNECTION_STRING);
             await client.connect();
-            const db = client.db('mydatabase');
-            const formattedDate = new Date().toLocaleDateString();
+            const db = client.db(process.env.DB_NAME || 'mydatabase');
+            // Explicit DD/MM/YYYY. toLocaleDateString() depends on the container
+            // locale, so user_info.date could disagree with the DD/MM/YYYY used
+            // in the *_top snapshots depending on where this ran.
+            const now = new Date();
+            const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(
+                now.getMonth() + 1
+            ).padStart(2, '0')}/${now.getFullYear()}`;
 
             // get ryan info
             try {
@@ -428,10 +431,13 @@ async function updateUserData() {
                 allTasks.push(...page1Tasks);
 
                 // Sequential: one click -> one new tab -> one getTopScore. (Multiple waitForNewPage listeners would all get the same first tab.)
-                async function scrapeFriendsSequential(friendListPage, tasks) {
+                async function scrapeFriendsSequential(friendListPage, tasks, skipIdx = new Set()) {
                     const links = await friendListPage.$$('a[target="friendRating"]');
                     for (let i = 0; i < tasks.length; i++) {
                         const { friendIdx } = tasks[i];
+                        // `links` is index-aligned with `tasks`, so skip in place
+                        // rather than filtering the task list.
+                        if (skipIdx.has(friendIdx)) continue;
                         if (!links[i]) continue;
                         const newPagePromise = waitForNewPage(browser);
                         await links[i].click();
@@ -513,10 +519,17 @@ async function updateUserData() {
                         if (newOnPage2.length === 0) {
                             console.log('[update] page 2: no new friends (list unchanged or only one page)');
                         } else {
-                            await insertFriendUserInfo(db, formattedDate, page2Friends);
-                            allTasks.push(...page2Tasks);
+                            // Only insert/scrape friends we haven't already handled on page 1.
+                            // Previously the whole of page 2 was re-scraped, duplicating any
+                            // overlapping friend's user_info and top-score documents.
+                            await insertFriendUserInfo(
+                                db,
+                                formattedDate,
+                                page2Friends.filter((f) => !page1IdSet.has(f.friendIdx))
+                            );
+                            allTasks.push(...newOnPage2);
                             console.log('[update] collected friends from page 2:', newOnPage2.length);
-                            await scrapeFriendsSequential(page, page2Tasks);
+                            await scrapeFriendsSequential(page, page2Tasks, page1IdSet);
                         }
                     } else {
                         console.log('[update] page 2: pagination button not found (only one page of friends?)');
@@ -529,20 +542,16 @@ async function updateUserData() {
             }
 
             console.log('[update] finished successfully');
-            await client.close();
-            try {
-                await browser.close();
-            } catch (e) {}
             return true;
         } catch (e) {
             console.log('[update] Unhandled exception during attempt:', e);
-            if (browser) {
-                try {
-                    await browser.close();
-                } catch (err) {}
-                browser = null;
+        } finally {
+            if (client) {
+                await client.close().catch((err) => console.log('[update] mongo close failed:', err.message));
             }
-            continue;
+            if (browser) {
+                await browser.close().catch((err) => console.log('[update] browser close failed:', err.message));
+            }
         }
     }
     console.log('[update] finished attempts, nothing succeeded');

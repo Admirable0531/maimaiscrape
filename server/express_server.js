@@ -1,67 +1,84 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const path = require('path');
-const { MongoClient } = require('mongodb');
-
-// Allow scraping sites with non-standard TLS chains (maimaidx.jp images).
-// This disables certificate verification for outgoing HTTPS requests in this
-// process, which is acceptable for this internal scraper API.
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+const https = require('https');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const { updateUserData } = require('./update_user_data');
 const updateScore = require('./update_score');
 const { getTopCollectionName } = require('./collectionNames');
+const { getDb, closeMongo } = require('../Discord_Bot/lib/mongo');
+
+const friendsWebhook = require('../Discord_Bot/scripts/friends_webhook');
 
 const app = express();
 app.use(express.json());
 
-// Polyfill minimal browser globals before loading cheerio/undici
-if (typeof globalThis.File === 'undefined') {
-    globalThis.File = class File {};
-}
-if (typeof globalThis.Blob === 'undefined') {
-    // Node 18 has Blob in buffer; use it if available
-    try {
-        const { Blob } = require('buffer');
-        globalThis.Blob = globalThis.Blob || Blob;
-    } catch (e) {
-        globalThis.Blob = class Blob {};
-    }
-}
-if (typeof globalThis.FormData === 'undefined') {
-    globalThis.FormData = globalThis.FormData || class FormData {};
+/**
+ * SEGA's image hosts serve art on a non-standard TLS chain.
+ *
+ * This used to be handled by setting NODE_TLS_REJECT_UNAUTHORIZED=0 at the top
+ * of the file, which disabled certificate verification for *every* outgoing
+ * request in the process — MongoDB and Discord webhooks included. Node's global
+ * fetch has no per-request agent option, so image downloads go through
+ * https.get with a relaxed agent scoped to those hosts only.
+ */
+const relaxedAgent = new https.Agent({ rejectUnauthorized: false });
+const RELAXED_TLS_HOSTS = /(^|\.)(maimaidx(-eng)?\.(jp|com)|maimai\.sega\.jp)$/;
+
+/** Downloads a binary body, relaxing TLS verification for SEGA hosts only. */
+function fetchBinary(url, redirectsLeft = 3) {
+    return new Promise((resolve, reject) => {
+        let parsed;
+        try {
+            parsed = new URL(url);
+        } catch (err) {
+            reject(new Error(`invalid url: ${err.message}`));
+            return;
+        }
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            reject(new Error('only http(s) urls are supported'));
+            return;
+        }
+
+        const transport = parsed.protocol === 'https:' ? https : require('http');
+        const options = RELAXED_TLS_HOSTS.test(parsed.hostname) ? { agent: relaxedAgent } : {};
+
+        transport
+            .get(parsed, options, (res) => {
+                const { statusCode = 0, headers } = res;
+                if (statusCode >= 300 && statusCode < 400 && headers.location && redirectsLeft > 0) {
+                    res.resume();
+                    resolve(fetchBinary(new URL(headers.location, parsed).toString(), redirectsLeft - 1));
+                    return;
+                }
+                if (statusCode < 200 || statusCode >= 300) {
+                    res.resume();
+                    reject(Object.assign(new Error(`upstream returned ${statusCode}`), { statusCode }));
+                    return;
+                }
+                const chunks = [];
+                res.on('data', (chunk) => chunks.push(chunk));
+                res.on('end', () =>
+                    resolve({
+                        buffer: Buffer.concat(chunks),
+                        mime: headers['content-type'] || 'image/jpeg',
+                    })
+                );
+            })
+            .on('error', reject);
+    });
 }
 
-// fetch + HTML parsing for song images
-// prefer global fetch (Node 18+), fallback to dynamic import of node-fetch only if needed
-const cheerio = require('cheerio');
-const fetch = (typeof globalThis.fetch === 'function')
-    ? globalThis.fetch.bind(globalThis)
-    : (...args) => import('node-fetch').then(({ default: f }) => f(...args));
-// Puppeteer fallback for pages that render results client-side
-let puppeteer;
-try {
-    puppeteer = require('puppeteer');
-} catch (e) {
-    try { puppeteer = require('puppeteer-core'); } catch (e2) { puppeteer = null; }
+/** Fetches a URL and returns it as a base64 data: URL. */
+async function toDataUrl(url) {
+    const { buffer, mime } = await fetchBinary(url);
+    return `data:${mime};base64,${buffer.toString('base64')}`;
 }
 
-// MongoDB connection – reuse a single client to avoid slow new connection per request
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongodb:27017/';
-const DB_NAME = 'mydatabase';
-
-let mongoClient = null;
-
-async function getDatabase() {
-    if (mongoClient) {
-        return mongoClient.db(DB_NAME);
-    }
-    mongoClient = new MongoClient(MONGO_URI);
-    await mongoClient.connect();
-    return mongoClient.db(DB_NAME);
-}
+// Single shared MongoClient for the process (see Discord_Bot/lib/mongo.js)
+const getDatabase = getDb;
 
 // API endpoints for users and scores (username = 'ryan' or friendIdx as string: '0','1',...)
 app.get('/users', async (req, res) => {
@@ -89,14 +106,16 @@ app.get('/users', async (req, res) => {
 app.get('/users/:username/top-score', async (req, res) => {
     try {
         const { username } = req.params;
-        const db = await getDatabase();
+        // Validate before touching Mongo, so a bad id returns 400 rather than
+        // failing later as a 500.
         const id = username === 'ryan' ? 'ryan' : username; // friendIdx from link (e.g. 6020500221031)
         const collectionName = getTopCollectionName(id);
         if (!collectionName) {
             return res.status(400).json({ success: false, error: 'invalid user id' });
         }
+        const db = await getDatabase();
         const collection = db.collection(collectionName);
-        
+
         const topScore = await collection.findOne({}, { sort: { _id: -1 } });
         
         if (!topScore) {
@@ -143,12 +162,12 @@ app.get('/users/:username/scores-by-date', async (req, res) => {
         }
         const escapedPrefix = searchPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-        const db = await getDatabase();
         const id = username === 'ryan' ? 'ryan' : username;
         const collectionName = getTopCollectionName(id);
         if (!collectionName) {
             return res.status(400).json({ error: 'invalid user id' });
         }
+        const db = await getDatabase();
         const collection = db.collection(collectionName);
 
         // Find all records where the stored Date string starts with the requested date prefix.
@@ -175,12 +194,12 @@ app.get('/users/:username/scores-by-date', async (req, res) => {
 app.get('/users/:username/top-history', async (req, res) => {
     try {
         const { username } = req.params;
-        const db = await getDatabase();
         const id = username === 'ryan' ? 'ryan' : username;
         const collectionName = getTopCollectionName(id);
         if (!collectionName) {
             return res.status(400).json({ error: 'invalid user id' });
         }
+        const db = await getDatabase();
         const collection = db.collection(collectionName);
 
         // Fetch all snapshots up to a high cap so rating history shows full range (e.g. from April 2024)
@@ -209,14 +228,15 @@ async function getSegaSongs() {
         return segaSongsCache;
     }
     try {
-        const r = await fetch('https://maimai.sega.jp/data/maimai_songs.json');
-        if (!r.ok) throw new Error(`SEGA API returned ${r.status}`);
-        segaSongsCache = await r.json();
+        // Goes through fetchBinary so the SEGA host keeps its relaxed TLS agent;
+        // this request previously relied on the process-wide verification bypass.
+        const { buffer } = await fetchBinary('https://maimai.sega.jp/data/maimai_songs.json');
+        segaSongsCache = JSON.parse(buffer.toString('utf8'));
         segaSongsCacheTime = now;
         console.log(`[server] Cached ${segaSongsCache.length} songs from SEGA`);
         return segaSongsCache;
     } catch (err) {
-        console.error('[server] Failed to fetch SEGA songs:', err);
+        console.error('[server] Failed to fetch SEGA songs:', err.message);
         return null;
     }
 }
@@ -252,19 +272,10 @@ app.get('/image-data', async (req, res) => {
         const { url } = req.query;
         if (!url) return res.status(400).json({ error: 'missing url' });
 
-        const r = await fetch(url);
-        if (!r.ok) {
-            return res.status(502).json({ error: `failed to fetch image (${r.status})` });
-        }
-        const arrayBuf = await r.arrayBuffer();
-        const buf = Buffer.from(arrayBuf);
-        const mime = r.headers.get('content-type') || 'image/jpeg';
-        const base64 = buf.toString('base64');
-        const dataUrl = `data:${mime};base64,${base64}`;
-        res.json({ image: dataUrl });
+        res.json({ image: await toDataUrl(url) });
     } catch (err) {
-        console.error('[server] /image-data error:', err);
-        res.status(500).json({ error: String(err) });
+        console.error('[server] /image-data error:', err.message);
+        res.status(err.statusCode ? 502 : 500).json({ error: String(err.message || err) });
     }
 });
 
@@ -314,79 +325,77 @@ app.get('/song-image-data', async (req, res) => {
         }
 
         const imageUrl = `https://maimaidx.jp/maimai-mobile/img/Music/${song.image_url}`;
-        const r = await fetch(imageUrl);
-        if (!r.ok) {
-            return res.status(502).json({ error: `failed to fetch image (${r.status})` });
-        }
-        const arrayBuf = await r.arrayBuffer();
-        const buf = Buffer.from(arrayBuf);
-        const mime = r.headers.get('content-type') || 'image/jpeg';
-        const base64 = buf.toString('base64');
-        const dataUrl = `data:${mime};base64,${base64}`;
+        const dataUrl = await toDataUrl(imageUrl);
         setCachedSongImageData(title, dataUrl);
         res.json({ image: dataUrl });
     } catch (err) {
-        console.error('[server] /song-image-data error:', err);
-        res.status(500).json({ error: String(err) });
+        console.error('[server] /song-image-data error:', err.message);
+        res.status(err.statusCode ? 502 : 500).json({ error: String(err.message || err) });
     }
 });
 
-app.post('/run-update-user-data', async (req, res) => {
-    try {
-        console.log('[server] /run-update-user-data triggered');
-        const ok = await updateUserData();
-        res.json({ success: !!ok });
-    } catch (err) {
-        console.error('[server] update-user-data error', err);
-        res.status(500).json({ success: false, error: String(err) });
-    }
-});
+/**
+ * Guards the browser-driven jobs so two callers can't run one concurrently.
+ * Both the daily cron and the /scraper slash command hit these, and launching a
+ * second Chromium mid-scrape produced duplicate inserts.
+ */
+const inFlight = new Set();
 
-app.post('/run-update-score', async (req, res) => {
-    try {
-        console.log('[server] /run-update-score triggered');
-        if (typeof updateScore.runStandalone === 'function') {
-            const messages = await updateScore.runStandalone();
-            res.json({ success: true, messages });
-        } else if (typeof updateScore.execute === 'function') {
-            const outputs = [];
-            const fakeChannel = { send: (p) => { outputs.push(p); return Promise.resolve(); } };
-            await updateScore.execute(fakeChannel);
-            res.json({ success: true, messages: outputs });
-        } else {
-            res.status(500).json({ success: false, error: 'update_score has no runnable export' });
+function runExclusive(name, task) {
+    return async (req, res) => {
+        if (inFlight.has(name)) {
+            console.log(`[server] ${name} already running; rejecting duplicate trigger`);
+            res.status(409).json({ success: false, error: `${name} is already running` });
+            return;
         }
-    } catch (err) {
-        console.error('[server] update-score error', err);
-        res.status(500).json({ success: false, error: String(err) });
-    }
-});
-
-app.post('/run-friends-webhook', async (req, res) => {
-    try {
-        console.log('[server] /run-friends-webhook triggered');
-        let friendsWebhook = null;
+        inFlight.add(name);
         try {
-            friendsWebhook = require('../Discord_Bot/scripts/friends_webhook');
-        } catch (e) {
-            res.status(500).json({ success: false, error: `failed to load friends_webhook: ${String(e)}` });
-            return;
+            console.log(`[server] ${name} triggered`);
+            const payload = await task(req);
+            res.json({ success: true, ...payload });
+        } catch (err) {
+            console.error(`[server] ${name} error:`, err);
+            res.status(500).json({ success: false, error: String(err) });
+        } finally {
+            inFlight.delete(name);
         }
-        if (friendsWebhook && typeof friendsWebhook.run === 'function') {
-            await friendsWebhook.run();
-            res.json({ success: true });
-            return;
-        }
-        res.status(500).json({ success: false, error: 'friends_webhook has no runnable export' });
-    } catch (err) {
-        console.error('[server] friends-webhook error', err);
-        res.status(500).json({ success: false, error: String(err) });
-    }
-});
+    };
+}
+
+app.post(
+    '/run-update-user-data',
+    runExclusive('run-update-user-data', async () => ({ success: !!(await updateUserData()) }))
+);
+
+app.post(
+    '/run-update-score',
+    runExclusive('run-update-score', async () => ({ messages: await updateScore.runStandalone() }))
+);
+
+app.post(
+    '/run-friends-webhook',
+    runExclusive('run-friends-webhook', async (req) => {
+        const { sendWebhook = false, saveToMongo = true, accountType = 'fy' } = req.body || {};
+        const result = await friendsWebhook.run({ sendWebhook, saveToMongo, accountType });
+        return { ...result, success: !!result.ok };
+    })
+);
 
 const port = process.env.EXPRESS_PORT || 3000;
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`[server] Express server listening on port ${port}`);
 });
+
+// Close the Mongo client and stop accepting connections on container shutdown.
+for (const signal of ['SIGTERM', 'SIGINT']) {
+    process.on(signal, () => {
+        console.log(`[server] ${signal} received, shutting down`);
+        server.close(() => {
+            closeMongo()
+                .catch(() => {})
+                .finally(() => process.exit(0));
+        });
+    });
+}
 
 module.exports = app;

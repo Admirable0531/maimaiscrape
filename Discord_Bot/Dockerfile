@@ -1,6 +1,8 @@
+# Shared image for the Discord bot and the express api.
+# Both need Node + Chromium (Puppeteer) + the bot scripts + server/.
 FROM node:18-bullseye
 
-# Install Chromium dependencies
+# Chromium and its runtime libraries
 RUN apt-get update && apt-get install -y \
   chromium \
   fonts-liberation \
@@ -19,16 +21,22 @@ RUN apt-get update && apt-get install -y \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
 
-# Puppeteer expects this environment variable if Chromium is not bundled
+# Use the system Chromium and skip Puppeteer's own download: the bundled build is
+# x86-only, so on ARM (Raspberry Pi) it is both a large wasted download and unusable.
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_DOWNLOAD=1
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1
 
 WORKDIR /app
 
-COPY Discord_Bot/package*.json ./
-RUN npm install
+COPY package*.json ./
+RUN npm install --omit=dev
 
-# when building from project root (docker-compose api), copy the Discord_Bot folder
-COPY Discord_Bot/. ./
-COPY server/. ./server/
+# Keep the repository layout inside the image, so relative requires such as
+# server/ -> ../Discord_Bot/config resolve identically in Docker and locally.
+# (Previously Discord_Bot/* was flattened into /app, which broke
+# server/express_server.js's require of ../Discord_Bot/scripts/friends_webhook.)
+COPY Discord_Bot/ ./Discord_Bot/
+COPY server/ ./server/
 
-CMD ["node", "."]
+CMD ["node", "Discord_Bot/index.js"]

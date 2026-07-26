@@ -1,93 +1,119 @@
-# Running commands inside Docker (e.g. from SSH on Raspberry Pi)
+# Running commands inside Docker (e.g. over SSH on the Raspberry Pi)
 
-From the project directory on the Pi (`~/Desktop/maimaiscrape` or wherever the repo is):
+Run these from the project directory on the Pi (`~/Desktop/maimai/maimaiscrape`).
 
----
-
-## Watch the browser (visible mode) or save screenshots
-
-**Option 1: Screenshots (works over plain SSH)**  
-Saves PNGs at key steps so you can inspect after the run or `scp` them to your laptop.
-
-```bash
-# With Docker: mount a folder so you can copy screenshots out
-docker compose run --rm \
-  -e SCREENSHOT_DEBUG=1 \
-  -v "$(pwd)/screenshots:/app/screenshots" \
-  scraper node server/update_user_data.js
-```
-
-Then open `./screenshots/` (e.g. `01_home_*.png`, `04_friend_list_*.png`, `05_friend_6020500221031_*.png`).
-
-**Option 2: Visible browser on the Pi (monitor attached)**  
-Run the scraper **on the host** (not in Docker) so Chromium uses the Pi’s display. On ARM you must have system Chromium installed (same as the Docker image):
-
-```bash
-sudo apt update && sudo apt install chromium
-cd ~/Desktop/maimaiscrape
-HEADLESS=false DISPLAY=:0 MONGO_URI=mongodb://localhost:27017/ node server/update_user_data.js
-```
-
-**Option 3: Visible browser over SSH (window on your laptop)**  
-From your **laptop** connect with X11 forwarding, then run the scraper (on the Pi, not in Docker):
-
-```bash
-# On your laptop
-ssh -X pi@<pi-ip>
-cd ~/Desktop/maimaiscrape
-HEADLESS=false npm run scraper
-# MONGO_URI=mongodb://localhost:27017/ if needed
-```
-
-The browser window will open on your laptop. Requires an X server on the laptop (e.g. XQuartz on macOS, VcXsrv/Xming on Windows, or native X on Linux).
-
-**Why Docker works but host failed:** The scraper image installs Chromium via `apt install chromium` and sets `PUPPETEER_EXECUTABLE_PATH`. On the Pi without Docker, no system Chromium was found, so Puppeteer used its bundled browser—which is x86 only. Installing Chromium on the host (`sudo apt install chromium`) makes non-Docker runs use the same approach as the container.
+Images mirror the repository layout under `/app`, so paths are the same as in the
+repo: `Discord_Bot/...` and `server/...`.
 
 ---
 
-## Run scraper once (manual run)
+## Everyday operations
 
-Uses the `scraper` image; connects to MongoDB as `mongodb:27017` inside the network.
+```bash
+# Rebuild and restart everything
+docker compose up -d --build
+
+# Follow logs
+docker compose logs -f bot
+docker compose logs -f api
+
+# Re-register slash commands (needed after adding or editing one)
+docker compose exec bot node Discord_Bot/deploy-commands.js
+```
+
+## Run the daily pipeline now
+
+Easiest is `/daily` in Discord. From the shell, trigger the individual steps:
+
+```bash
+# Step 1 – top scores + profiles
+curl -X POST http://localhost:3000/run-update-user-data
+
+# Step 2 – friend rating snapshot
+curl -X POST http://localhost:3000/run-friends-webhook \
+  -H 'Content-Type: application/json' \
+  -d '{"accountType":"fy","saveToMongo":true,"sendWebhook":false}'
+
+# Step 3 – build the score-diff embeds (returns them as JSON)
+curl -X POST http://localhost:3000/run-update-score
+```
+
+These endpoints refuse to run twice at once and answer `409` if a job is already
+in flight.
+
+## One-off scraper runs
+
+The `scraper` service is in the `manual` profile, so `docker compose up` does not
+start it. Use `run` for a one-off:
 
 ```bash
 docker compose run --rm scraper node server/update_user_data.js
 ```
 
-`--rm` removes the container after it exits.
-
-## Run migration (old name collections → friendIdx)
-
-Uses the `api` service (has Node + server code and can reach MongoDB). Run this once to copy old `yuchen_top` etc. into `friend_6020500221031_top` and update `user_info`.
+Individual scripts can also be run in the bot container:
 
 ```bash
-docker compose run --rm api node server/scripts/migrate-collections-to-friend-idx.js
+docker compose exec bot node Discord_Bot/scripts/friends_webhook.js
+docker compose exec bot node Discord_Bot/scripts/circle_ranking_scraper.js
+docker compose exec bot node Discord_Bot/scripts/daily_points_tracker.js
 ```
 
-If the API container is already running you can use:
+## Screenshots / watching the browser
+
+**Screenshots (works over plain SSH).** The `api` and `scraper` services mount
+`./screenshots`, so files land in the project directory:
+
+```bash
+docker compose run --rm -e SCREENSHOT_DEBUG=1 scraper node server/update_user_data.js
+ls ./screenshots/
+```
+
+**Visible browser on the Pi (monitor attached).** Run on the host, not in Docker,
+so Chromium can use the Pi's display. On ARM you need system Chromium installed —
+Puppeteer's bundled build is x86 only:
+
+```bash
+sudo apt update && sudo apt install chromium
+cd ~/Desktop/maimai/maimaiscrape
+npm install
+HEADLESS=false DISPLAY=:0 MONGO_URI=mongodb://localhost:27017/mydatabase \
+  node server/update_user_data.js
+```
+
+**Visible browser over SSH (window on your laptop).** Connect with X11 forwarding
+and run on the host. Requires an X server locally (XQuartz on macOS, VcXsrv on
+Windows):
+
+```bash
+ssh -X pi@<pi-ip>
+cd ~/Desktop/maimai/maimaiscrape
+HEADLESS=false npm run scraper
+```
+
+## Migration (old name collections → friendIdx)
+
+Run once to copy `yuchen_top` etc. into `friend_6020500221031_top` and update
+`user_info`:
 
 ```bash
 docker compose exec api node server/scripts/migrate-collections-to-friend-idx.js
 ```
 
-## Open a shell in a container
+## Shells
 
 ```bash
-# Scraper container (Puppeteer / Chromium)
-docker compose exec scraper sh
-
-# API container
-docker compose exec api sh
-
-# Bot container
 docker compose exec bot sh
+docker compose exec api sh
+docker compose exec mongodb mongo mydatabase
 ```
 
-Then run commands inside that container (e.g. `node server/update_user_data.js` from `/app` in the scraper).
+## Reference
 
-## One-liner reference
-
-| What              | Command |
-|-------------------|--------|
+| What | Command |
+|------|---------|
+| Rebuild + restart | `docker compose up -d --build` |
+| Bot logs | `docker compose logs -f bot` |
+| Re-register commands | `docker compose exec bot node Discord_Bot/deploy-commands.js` |
 | Manual scraper run | `docker compose run --rm scraper node server/update_user_data.js` |
-| Migration         | `docker compose run --rm api node server/scripts/migrate-collections-to-friend-idx.js` |
-| Shell in scraper  | `docker compose exec scraper sh` |
+| Migration | `docker compose exec api node server/scripts/migrate-collections-to-friend-idx.js` |
+| Mongo shell | `docker compose exec mongodb mongo mydatabase` |

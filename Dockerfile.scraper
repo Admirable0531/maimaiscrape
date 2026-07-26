@@ -1,7 +1,7 @@
-# Puppeteer-based user-data scraper (replaces Selenium scraper)
+# Manual-run Puppeteer scraper image (see the `scraper` service in docker-compose.yml).
 FROM node:18-bullseye
 
-# Install Chromium and dependencies (same as Discord_Bot for Puppeteer)
+# Chromium and its runtime libraries (same set as Discord_Bot/Dockerfile)
 RUN apt-get update && apt-get install -y \
   chromium \
   fonts-liberation \
@@ -20,15 +20,19 @@ RUN apt-get update && apt-get install -y \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
 
+# Use system Chromium; Puppeteer's bundled build is x86-only and unusable on ARM.
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_DOWNLOAD=1
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1
 
 WORKDIR /app
 
-# Use bot's package.json for puppeteer, node-cron, dotenv
-COPY Discord_Bot/package*.json ./
-RUN npm install
+# Shares the bot's dependency set (puppeteer, mongodb, node-cron, dotenv)
+COPY package*.json ./
+RUN npm install --omit=dev
 
+# Mirror the repository layout so relative requires resolve as they do locally.
+COPY Discord_Bot/ ./Discord_Bot/
 COPY server/ ./server/
 
 CMD ["node", "server/run-user-data-cron.js"]

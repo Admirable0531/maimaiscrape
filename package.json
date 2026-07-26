@@ -2,15 +2,29 @@
   "name": "maimaiscrape",
   "version": "1.0.0",
   "private": true,
-  "description": "Maimai score scraper and API",
+  "description": "Maimai score scraper, Discord bot and API",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "migrate": "node server/scripts/migrate-collections-to-friend-idx.js",
+    "bot": "node Discord_Bot/index.js",
+    "api": "node server/express_server.js",
+    "deploy-commands": "node Discord_Bot/deploy-commands.js",
     "scraper": "node server/update_user_data.js",
-    "run-scraper": "node server/update_user_data.js"
+    "run-scraper": "node server/update_user_data.js",
+    "friends": "node Discord_Bot/scripts/friends_webhook.js",
+    "circle": "node Discord_Bot/scripts/circle_ranking_scraper.js",
+    "daily-points": "node Discord_Bot/scripts/daily_points_tracker.js",
+    "migrate": "node server/scripts/migrate-collections-to-friend-idx.js"
   },
   "dependencies": {
+    "discord.js": "^14.14.1",
     "dotenv": "^16.4.5",
+    "express": "^4.18.2",
     "mongodb": "^6.5.0",
-    "puppeteer": "^23.11.1"
+    "node-cron": "^3.0.3",
+    "puppeteer": "^23.11.1",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }

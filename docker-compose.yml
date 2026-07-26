@@ -1,5 +1,8 @@
 services:
-  # Discord bot: cron is ON — daily at 23:00 it POSTs /run-update-score to the API
+  # Discord bot. Owns every schedule:
+  #   DAILY_PIPELINE_AT (default 22:45) -> scrape top scores, scrape friend list,
+  #                                        post score diff, post friend leaderboard
+  #   CIRCLE_RUN_AT     (default 06:30) -> scrape circle rankings, then daily points
   bot:
     build:
       context: .
@@ -7,12 +10,13 @@ services:
     container_name: discord_bot
     env_file:
       - .env
-    # volumes:
-    #   - ./Discord_Bot:/app
     working_dir: /app
-    command: ["node", "."]
+    command: ["node", "Discord_Bot/index.js"]
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+      api:
+        condition: service_started
     restart: unless-stopped
     environment:
       - TZ=Asia/Kuala_Lumpur
@@ -25,6 +29,9 @@ services:
   mongodb:
     image: mongo:4.4.18
     container_name: mongodb
+    # NOTE: this publishes an unauthenticated MongoDB on the host's port 27017.
+    # Change to "127.0.0.1:27017:27017" (or drop it) unless you need access from
+    # another machine — the other services reach it over the compose network.
     ports:
       - "27017:27017"
     volumes:
@@ -44,30 +51,8 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Puppeteer user-data scraper: runs daily at RUN_AT (default 22:45) via node-cron
-  scraper:
-    build:
-      context: .
-      dockerfile: Dockerfile.scraper
-    container_name: puppeteer_scraper
-    depends_on:
-      - mongodb
-    env_file:
-      - .env
-    environment:
-      - TZ=Asia/Kuala_Lumpur
-      # RUN_AT=HH:MM (24h) for daily scrape; default 22:45
-      - RUN_AT=${RUN_AT:-22:45}
-    volumes:
-      - /dev/shm:/dev/shm
-    working_dir: /app
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
+  # Express api: web endpoints plus the Puppeteer jobs the bot triggers
+  # (/run-update-user-data, /run-update-score, /run-friends-webhook).
   api:
     build:
       context: .
@@ -76,7 +61,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     working_dir: /app
     command: ["node", "server/express_server.js"]
     ports:
@@ -84,6 +70,37 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Asia/Kuala_Lumpur
+    volumes:
+      # Debug screenshots land here when SCREENSHOT_DEBUG=1
+      - ./screenshots:/app/screenshots
+      - /dev/shm:/dev/shm
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Manual-only: the bot now owns the daily schedule, so this no longer runs a
+  # competing cron. Kept for one-off runs:
+  #   docker compose run --rm scraper node server/update_user_data.js
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    container_name: puppeteer_scraper
+    profiles: ["manual"]
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Kuala_Lumpur
+      - SCRAPER_CRON_ENABLED=${SCRAPER_CRON_ENABLED:-false}
+    volumes:
+      - ./screenshots:/app/screenshots
+      - /dev/shm:/dev/shm
+    working_dir: /app
     logging:
       driver: "json-file"
       options:

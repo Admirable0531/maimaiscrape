@@ -1,318 +1,248 @@
-const { MongoClient } = require('mongodb');
 const { EmbedBuilder } = require('discord.js');
-const config = require('../config');
+const config = require('../Discord_Bot/config');
+const { getDb } = require('../Discord_Bot/lib/mongo');
 const { getTopCollectionName, getFriendIdxFromOldName } = require('./collectionNames');
 
-module.exports = {
-    async execute(channel) {
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-        const day = today.getDate();
-        const month = today.getMonth() + 1;
-        const formattedDay = ('0' + day).slice(-2);
-        const formattedYesterday = ('0' + yesterday.getDate()).slice(-2);
-        const formattedYesterMonth = ('0' + (yesterday.getMonth() + 1)).slice(-2);
-        const formattedMonth = ('0' + month).slice(-2);
-        const yesterdayDate = formattedYesterday + '/' + formattedYesterMonth;
-        const todayDate = formattedDay + '/' + formattedMonth;
+const SONG_DB_URL = 'https://arcade-songs.zetaraku.dev/maimai/';
+const MAX_FIELDS_PER_EMBED = 25;
+/** How many recent snapshots to scan when looking for one from an earlier day. */
+const SNAPSHOT_SCAN_LIMIT = 30;
 
-        const dateEmbed = new EmbedBuilder().setColor(0x0099ff).setAuthor({
-            name: yesterdayDate + ' -> ' + todayDate,
-            iconURL: 'https://maimai.sega.jp/storage/area/region/universe/icon/03.png',
-        });
+function pad2(n) {
+    return String(n).padStart(2, '0');
+}
 
-        channel.send({ embeds: [dateEmbed] });
+function formatDDMM(date) {
+    return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}`;
+}
 
-        const uri = config.MONGO_URI;
-        const dbName = 'mydatabase';
+/** Calendar day (YYYY-MM-DD, UTC) of a document, from the timestamp inside its ObjectId. */
+function getCalendarDay(id) {
+    if (!id || typeof id.getTimestamp !== 'function') return '';
+    const d = id.getTimestamp();
+    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
 
-        const client = new MongoClient(uri);
+/** Compare loosely: the scrapers store ratings as both strings and numbers over time. */
+function normalizeRating(rating) {
+    if (rating == null) return null;
+    const str = String(rating).trim();
+    const num = parseFloat(str);
+    return Number.isNaN(num) ? str : num;
+}
 
-        // Same as scraper/web API: use user_info to get ryan + friendIdxs, so we only use ryan_top and friend_<idx>_top
-        let users = [];
+function normalizeAchv(achv) {
+    return achv == null ? null : String(achv).trim();
+}
+
+function sameChart(a, b) {
+    return a.Song === b.Song && a.Diff === b.Diff && a.Chart === b.Chart;
+}
+
+/** Entries in `current` that are new, or whose rating/achievement moved. */
+function findImprovedEntries(current, previous) {
+    const previousList = Array.isArray(previous) ? previous : [];
+    return (Array.isArray(current) ? current : []).filter((entry) => {
+        const before = previousList.find((item) => sameChart(item, entry));
+        if (!before) return true;
+        return (
+            normalizeRating(entry.Rating) !== normalizeRating(before.Rating) ||
+            normalizeAchv(entry.Achv) !== normalizeAchv(before.Achv)
+        );
+    });
+}
+
+function formatScoreLine(song, tag) {
+    const songLink = `${SONG_DB_URL}?title=${encodeURIComponent(song.Song)}&types=${encodeURIComponent(
+        String(song.Chart || '').toLowerCase()
+    )}`;
+    return (
+        `${song.Rank} | ${song.Rating}rt | [${song.Song}](${songLink}) ` +
+        `[${String(song.Diff || '').toUpperCase()}] (${song.Chart}) | ${song.Level} | ${song.Achv} | ${tag}`
+    );
+}
+
+/**
+ * Resolves the set of user ids to report on ('ryan' plus friendIdx strings),
+ * taken from user_info so we only ever read ryan_top / friend_<idx>_top.
+ */
+async function loadUserIds(db) {
+    try {
+        const docs = await db.collection('user_info').find({}).sort({ _id: -1 }).toArray();
+        const ids = [];
+        const seen = new Set();
+
+        for (const doc of docs) {
+            const friendIdx = doc.friendIdx != null ? String(doc.friendIdx) : null;
+            const userVal = doc.user != null ? String(doc.user) : null;
+
+            let id = null;
+            if (userVal === 'ryan') id = 'ryan';
+            else if (friendIdx && /^\d+$/.test(friendIdx)) id = friendIdx;
+            else if (userVal && /^\d+$/.test(userVal)) id = userVal;
+            else if (userVal && config.idxMap?.[userVal]) id = config.idxMap[userVal];
+            else if (userVal && getFriendIdxFromOldName(userVal)) id = getFriendIdxFromOldName(userVal);
+
+            if (id && !seen.has(id)) {
+                seen.add(id);
+                ids.push(id);
+            }
+        }
+        if (ids.length > 0) return ids;
+        console.warn('[update_score] user_info yielded no ids; falling back to config.users');
+    } catch (err) {
+        console.error('[update_score] failed to load users from user_info:', err.message);
+    }
+    return config.users || [];
+}
+
+function resolveUserId(user) {
+    if (user === 'ryan') return 'ryan';
+    return config.idxMap?.[user] || getFriendIdxFromOldName(user) || user;
+}
+
+/** Latest snapshot plus the newest one from an earlier calendar day. */
+async function loadSnapshotPair(db, collectionName) {
+    const documents = await db
+        .collection(collectionName)
+        .find()
+        .sort({ _id: -1 })
+        .limit(SNAPSHOT_SCAN_LIMIT)
+        .toArray();
+
+    const current = documents[0];
+    if (!current) {
+        console.error(`[update_score] ${collectionName}: no data`);
+        return null;
+    }
+
+    const currentDay = getCalendarDay(current._id);
+    const previous = documents.slice(1).find((doc) => getCalendarDay(doc._id) !== currentDay);
+    if (!previous) {
+        console.error(`[update_score] ${collectionName}: no snapshot from an earlier day to compare`);
+        return null;
+    }
+    return { current, previous };
+}
+
+async function getUserInfo(db, userId) {
+    try {
+        const doc = await db.collection('user_info').findOne({ user: String(userId) }, { sort: { _id: -1 } });
+        if (!doc) {
+            console.error('[update_score] no user_info for', userId);
+            return { imgSrc: null, name: String(userId), rating: '' };
+        }
+        return { imgSrc: doc.img_src ?? null, name: doc.name ?? String(userId), rating: doc.rating ?? '' };
+    } catch (err) {
+        console.error('[update_score] getUserInfo failed:', err.message);
+        return { imgSrc: null, name: String(userId), rating: '' };
+    }
+}
+
+/** Builds the per-user embeds. Returns [] when there is nothing worth posting. */
+async function buildUserEmbeds(db, userId) {
+    const collectionName = getTopCollectionName(userId);
+    if (!collectionName) {
+        console.error('[update_score] unknown user:', userId);
+        return [];
+    }
+
+    const pair = await loadSnapshotPair(db, collectionName);
+    if (!pair) return [];
+
+    const { current, previous } = pair;
+    const ratingDiff = (current.rating ?? 0) - (previous.rating ?? 0);
+    const ratingDiffStr = `(${ratingDiff >= 0 ? '+' : '-'}${Math.abs(ratingDiff)}rt)`;
+
+    const lines = [
+        ...findImprovedEntries(current.new, previous.new).map((song) => formatScoreLine(song, 'NEW')),
+        ...findImprovedEntries(current.old, previous.old).map((song) => formatScoreLine(song, 'OLD')),
+    ];
+
+    const { imgSrc, name, rating } = await getUserInfo(db, userId);
+    const author = { name: `${name} ${rating}rt ${ratingDiffStr}`, iconURL: imgSrc || undefined };
+
+    if (lines.length === 0) {
+        // Always show Ryan so the daily post is never completely empty.
+        if (userId !== 'ryan') return [];
+        return [
+            new EmbedBuilder()
+                .setColor(0x7289da)
+                .setAuthor(author)
+                .addFields({ name: ' ', value: 'No individual top song changes today.' }),
+        ];
+    }
+
+    const embeds = [];
+    for (let i = 0; i < lines.length; i += MAX_FIELDS_PER_EMBED) {
+        const embed = new EmbedBuilder().setColor(0x7289da).setAuthor(author);
+        for (const line of lines.slice(i, i + MAX_FIELDS_PER_EMBED)) {
+            embed.addFields({ name: ' ', value: line });
+        }
+        embeds.push(embed);
+    }
+    return embeds;
+}
+
+/**
+ * Posts the daily score diff for every tracked user to `channel`.
+ *
+ * Every send is awaited. Previously `compareSongs()` was called without `await`,
+ * so `execute()` resolved before the embeds were built — which made
+ * `runStandalone()` return a partial (often empty) message list, and the daily
+ * 23:00 post silently dropped users.
+ */
+async function execute(channel) {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    const dateEmbed = new EmbedBuilder().setColor(0x0099ff).setAuthor({
+        name: `${formatDDMM(yesterday)} -> ${formatDDMM(today)}`,
+        iconURL: 'https://maimai.sega.jp/storage/area/region/universe/icon/03.png',
+    });
+    await channel.send({ embeds: [dateEmbed] });
+
+    const db = await getDb();
+    const users = await loadUserIds(db);
+    console.log(`[update_score] reporting on ${users.length} user(s)`);
+
+    for (const user of users) {
+        const userId = resolveUserId(user);
         try {
-            await client.connect();
-            const db = client.db(dbName);
-            const userInfoCol = db.collection('user_info');
-            const docs = await userInfoCol.find({}).sort({ _id: -1 }).toArray();
-            const seen = new Set();
-            for (const doc of docs) {
-                let id = null;
-                const friendIdx = doc.friendIdx != null ? String(doc.friendIdx) : null;
-                const userVal = doc.user != null ? String(doc.user) : null;
-                // Ryan is a special case: always map to 'ryan' so we use ryan_top
-                if (userVal === 'ryan') {
-                    id = 'ryan';
-                } else if (friendIdx && /^\d+$/.test(friendIdx)) {
-                    id = friendIdx;
-                } else if (userVal && /^\d+$/.test(userVal)) {
-                    id = userVal;
-                } else if (userVal && config.idxMap && config.idxMap[userVal]) {
-                    id = config.idxMap[userVal];
-                } else if (userVal && getFriendIdxFromOldName && getFriendIdxFromOldName(userVal)) {
-                    id = getFriendIdxFromOldName(userVal);
-                }
-                if (id != null && id !== '' && !seen.has(id)) {
-                    seen.add(id);
-                    users.push(id);
-                }
+            const embeds = await buildUserEmbeds(db, userId);
+            for (const embed of embeds) {
+                await channel.send({ embeds: [embed] });
             }
-        } catch (e) {
-            console.error('Failed to load users from user_info, falling back to config.users:', e.message);
-            users = config.users || [];
+        } catch (err) {
+            console.error(`[update_score] failed for ${userId}:`, err.message);
         }
+    }
+}
 
-        function resolveUserId(user) {
-            if (user === 'ryan') return 'ryan';
-            if (config.idxMap && config.idxMap[user]) return config.idxMap[user];
-            if (getFriendIdxFromOldName && getFriendIdxFromOldName(user)) return getFriendIdxFromOldName(user);
-            return user;
-        }
-
-        /** Return calendar day YYYY-MM-DD from doc _id (ObjectId has timestamp) so we compare across days, not same-day duplicates. */
-        function getCalendarDay(id) {
-            if (!id || typeof id.getTimestamp !== 'function') return '';
-            const d = id.getTimestamp();
-            const y = d.getUTCFullYear();
-            const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(d.getUTCDate()).padStart(2, '0');
-            return y + '-' + m + '-' + day;
-        }
-
-        for (let i = 0; i < users.length; i++) {
-            await fetchData(users[i]);
-        }
-
-        async function fetchData(user) {
-            const userId = resolveUserId(user);
-            try {
-                await client.connect();
-
-                const db = client.db(dbName);
-
-                const collectionName = getTopCollectionName(userId);
-                if (!collectionName) {
-                    console.error('Unknown user:', user);
-                    return;
-                }
-                console.log(collectionName);
-                const collection = db.collection(collectionName);
-
-                // Fetch enough docs to find one from a different calendar day (avoids same-day duplicate scrapes)
-                const cursor = collection.find().sort({ _id: -1 }).limit(30);
-                const documents = await cursor.toArray();
-                const topSongsRecent = documents[0];
-                if (!topSongsRecent) {
-                    console.error(collectionName, 'missing data');
-                    return;
-                }
-                const recentDay = getCalendarDay(topSongsRecent._id);
-                let topSongsOld = null;
-                for (let i = 1; i < documents.length; i++) {
-                    const day = getCalendarDay(documents[i]._id);
-                    if (day !== recentDay) {
-                        topSongsOld = documents[i];
-                        break;
-                    }
-                }
-                if (!topSongsOld) {
-                    console.error(collectionName, 'no document from a different day to compare');
-                    return;
-                }
-                compareSongs(JSON.stringify(topSongsRecent), JSON.stringify(topSongsOld), userId);
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-
-        // Normalize values for comparison (handle string/number and whitespace)
-        function normalizeRating(rating) {
-            if (rating == null) return null;
-            const str = String(rating).trim();
-            const num = parseFloat(str);
-            return isNaN(num) ? str : num;
-        }
-
-        function normalizeAchv(achv) {
-            if (achv == null) return null;
-            return String(achv).trim();
-        }
-
-        async function compareSongs(file1, file2, userId) {
-            let new_records = [];
-
-            const data1 = JSON.parse(file1);
-            const data2 = JSON.parse(file2);
-
-            const rating1 = data1.rating;
-            const rating2 = data2.rating;
-
-            rating_diff = rating1 - rating2;
-            const prefix = rating_diff >= 0 ? '+' : '-';
-            const rating_diff_str = '(' + prefix + Math.abs(rating_diff).toString() + 'rt)';
-
-            const missingInFile2New = data1.new.filter((entry) => {
-                const correspondingEntry = data2.new.find(
-                    (item) => item.Song === entry.Song && item.Diff === entry.Diff && item.Chart === entry.Chart
-                );
-                if (correspondingEntry) {
-                    // Normalize before comparing to avoid false positives from whitespace/type differences
-                    const rating1Norm = normalizeRating(entry.Rating);
-                    const rating2Norm = normalizeRating(correspondingEntry.Rating);
-                    const achv1Norm = normalizeAchv(entry.Achv);
-                    const achv2Norm = normalizeAchv(correspondingEntry.Achv);
-                    return (
-                        rating1Norm !== rating2Norm ||
-                        achv1Norm !== achv2Norm
-                    );
-                }
-                return true;
-            });
-            const missingInFile2Old = data1.old.filter((entry) => {
-                const correspondingEntry = data2.old.find(
-                    (item) => item.Song === entry.Song && item.Diff === entry.Diff && item.Chart === entry.Chart
-                );
-                if (correspondingEntry) {
-                    // Normalize before comparing to avoid false positives from whitespace/type differences
-                    const rating1Norm = normalizeRating(entry.Rating);
-                    const rating2Norm = normalizeRating(correspondingEntry.Rating);
-                    const achv1Norm = normalizeAchv(entry.Achv);
-                    const achv2Norm = normalizeAchv(correspondingEntry.Achv);
-                    return (
-                        rating1Norm !== rating2Norm ||
-                        achv1Norm !== achv2Norm
-                    );
-                }
-                return true;
-            });
-
-            if (missingInFile2New.length > 0) {
-                console.log('Songs present in file1 but missing in file2:');
-                missingInFile2New.forEach((song) => {
-                    const matchingData = data1.new.find(
-                        (data) => data.Song === song.Song && data.Diff === song.Diff
-                    );
-                    const songLink =
-                        'https://arcade-songs.zetaraku.dev/maimai/?title=' +
-                        encodeURIComponent(song.Song) +
-                        '&types=' +
-                        encodeURIComponent(matchingData.Chart.toLowerCase());
-                    console.log(
-                        `- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song.Song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`
-                    );
-                    new_records.push(
-                        `${matchingData.Rank} | ${matchingData.Rating}rt | [${song.Song}](${songLink}) [${matchingData.Diff.toUpperCase()}] (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | NEW`
-                    );
-                });
-            } else {
-                console.log('All songs in file1 are also present in file2.');
-            }
-
-            if (missingInFile2Old.length > 0) {
-                console.log('Songs present in file1 but missing in file2:');
-                missingInFile2Old.forEach((song) => {
-                    const matchingData = data1.old.find(
-                        (data) => data.Song === song.Song && data.Diff === song.Diff
-                    );
-                    const songLink =
-                        'https://arcade-songs.zetaraku.dev/maimai/?title=' +
-                        encodeURIComponent(song.Song) +
-                        '&types=' +
-                        encodeURIComponent(matchingData.Chart.toLowerCase());
-                    console.log(
-                        `- Rank: ${matchingData.Rank}, Rating: ${matchingData.Rating}, Song: ${song.Song}, Chart: ${matchingData.Chart}, Level: ${matchingData.Level}, Achv: ${matchingData.Achv}`
-                    );
-                    new_records.push(
-                        `${matchingData.Rank} | ${matchingData.Rating}rt | [${song.Song}](${songLink}) [${matchingData.Diff.toUpperCase()}]  (${matchingData.Chart}) | ${matchingData.Level} | ${matchingData.Achv} | OLD`
-                    );
-                });
-            } else {
-                console.log('All songs in file1 are also present in file2.');
-            }
-            const [user_img_src, user_name, user_rating] = await getUserInfo(userId);
-            const MAX_FIELDS = 25;
-
-            if (new_records.length === 0) {
-                // Special case: always show Ryan's rating even if there are no per-song changes
-                if (userId === 'ryan') {
-                    const embed = new EmbedBuilder().setColor(0x7289da).setAuthor({
-                        name: `${user_name} ${user_rating}rt ${rating_diff_str}`,
-                        iconURL: user_img_src,
-                    });
-                    embed.addFields({
-                        name: ' ',
-                        value: 'No individual top song changes today.',
-                    });
-                    channel.send({ embeds: [embed] });
-                }
-            } else {
-                for (let i = 0; i < new_records.length; i += MAX_FIELDS) {
-                    const chunk = new_records.slice(i, i + MAX_FIELDS);
-
-                    const embedChunk = new EmbedBuilder().setColor(0x7289da).setAuthor({
-                        name: `${user_name} ${user_rating}rt ${rating_diff_str}`,
-                        iconURL: user_img_src,
-                    });
-
-                    chunk.forEach((score) => {
-                        embedChunk.addFields({ name: ' ', value: score });
-                    });
-
-                    channel.send({ embeds: [embedChunk] });
-                }
-            }
-        }
-
-        async function getUserInfo(userId) {
-            try {
-                await client.connect();
-
-                const db = client.db(dbName);
-
-                const collection = db.collection('user_info');
-                const userKey = userId == null ? '' : String(userId);
-
-                const cursor = collection.find({ user: userKey }).sort({ _id: -1 }).limit(1);
-                const documents = await cursor.toArray();
-                const document = documents[0];
-
-                if (!document) {
-                    console.error('No user_info for', userId);
-                    return [null, String(userId), ''];
-                }
-
-                const img_src = document.img_src ?? null;
-                const name = document.name ?? String(userId);
-                const rating = document.rating ?? '';
-
-                return [img_src, name, rating];
-            } catch (error) {
-                console.error('Error:', error);
-                return [null, String(userId), ''];
-            }
-        }
-    },
-};
-
-module.exports.runStandalone = async function () {
+/** Runs execute() against an in-memory channel and returns the collected payloads. */
+async function runStandalone() {
     const outputs = [];
     const fakeChannel = {
-        send: (payload) => {
+        async send(payload) {
             try {
                 if (payload && Array.isArray(payload.embeds)) {
-                    const embeds = payload.embeds.map((e) => (typeof e.toJSON === 'function' ? e.toJSON() : e));
-                    outputs.push({ embeds });
+                    outputs.push({
+                        embeds: payload.embeds.map((e) => (typeof e.toJSON === 'function' ? e.toJSON() : e)),
+                    });
                 } else {
-                    outputs.push({ content: payload && payload.content ? payload.content : JSON.stringify(payload) });
+                    outputs.push({
+                        content: payload?.content ? payload.content : JSON.stringify(payload),
+                    });
                 }
-            } catch (err) {
+            } catch {
                 outputs.push({ error: 'failed to serialize payload' });
             }
-            return Promise.resolve();
         },
     };
 
-    await module.exports.execute(fakeChannel);
+    await execute(fakeChannel);
     return outputs;
-};
+}
+
+module.exports = { execute, runStandalone };
