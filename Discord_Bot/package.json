@@ -2,7 +2,7 @@
   "name": "discord_bot",
   "version": "1.0.0",
   "description": "",
-  "main": "discord.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -17,6 +17,8 @@
     "puppeteer": "^23.11.1",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "express": "^4.18.2",
+    "cheerio": "^1.0.0-rc.12"
   }
 }

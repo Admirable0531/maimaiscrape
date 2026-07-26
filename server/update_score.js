@@ -1,16 +1,7 @@
 const { MongoClient } = require('mongodb');
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
-
-let getTopCollectionName, getFriendIdxFromOldName;
-try {
-    const collectionNames = require('../server/collectionNames');
-    getTopCollectionName = collectionNames.getTopCollectionName;
-    getFriendIdxFromOldName = collectionNames.getFriendIdxFromOldName;
-} catch (e) {
-    getTopCollectionName = (userId) => (userId === 'ryan' ? 'ryan_top' : /^\d+$/.test(userId) ? `friend_${userId}_top` : `${userId}_top`);
-    getFriendIdxFromOldName = () => null;
-}
+const { getTopCollectionName, getFriendIdxFromOldName } = require('./collectionNames');
 
 module.exports = {
     async execute(channel) {
@@ -38,7 +29,7 @@ module.exports = {
 
         const client = new MongoClient(uri);
 
-        // Get user ids (ryan + friendIdxs only) from user_info so we always use idx collections (friend_<id>_top)
+        // Same as scraper/web API: use user_info to get ryan + friendIdxs, so we only use ryan_top and friend_<idx>_top
         let users = [];
         try {
             await client.connect();
@@ -47,17 +38,17 @@ module.exports = {
             const docs = await userInfoCol.find({}).sort({ _id: -1 }).toArray();
             const seen = new Set();
             for (const doc of docs) {
-                // Prefer friendIdx (numeric) so we use friend_<idx>_top; else resolve doc.user (may be old name like 'yuchen')
                 let id = null;
                 const friendIdx = doc.friendIdx != null ? String(doc.friendIdx) : null;
                 const userVal = doc.user != null ? String(doc.user) : null;
-                if (friendIdx && /^\d+$/.test(friendIdx)) {
-                    id = friendIdx;
-                } else if (userVal === 'ryan') {
+                // Ryan is a special case: always map to 'ryan' so we use ryan_top
+                if (userVal === 'ryan') {
                     id = 'ryan';
+                } else if (friendIdx && /^\d+$/.test(friendIdx)) {
+                    id = friendIdx;
                 } else if (userVal && /^\d+$/.test(userVal)) {
                     id = userVal;
-                } else if (userVal && (config.idxMap && config.idxMap[userVal])) {
+                } else if (userVal && config.idxMap && config.idxMap[userVal]) {
                     id = config.idxMap[userVal];
                 } else if (userVal && getFriendIdxFromOldName && getFriendIdxFromOldName(userVal)) {
                     id = getFriendIdxFromOldName(userVal);
@@ -72,11 +63,6 @@ module.exports = {
             users = config.users || [];
         }
 
-        for (const auser of users) {
-            await fetchData(auser);
-        }
-
-        // Resolve name (e.g. 'kok') to userId (friendIdx or 'ryan') so we always use idx collections (friend_<id>_top)
         function resolveUserId(user) {
             if (user === 'ryan') return 'ryan';
             if (config.idxMap && config.idxMap[user]) return config.idxMap[user];
@@ -84,7 +70,7 @@ module.exports = {
             return user;
         }
 
-        /** Return calendar day YYYY-MM-DD from doc _id so we compare across days, not same-day duplicates. */
+        /** Return calendar day YYYY-MM-DD from doc _id (ObjectId has timestamp) so we compare across days, not same-day duplicates. */
         function getCalendarDay(id) {
             if (!id || typeof id.getTimestamp !== 'function') return '';
             const d = id.getTimestamp();
@@ -94,12 +80,17 @@ module.exports = {
             return y + '-' + m + '-' + day;
         }
 
+        for (let i = 0; i < users.length; i++) {
+            await fetchData(users[i]);
+        }
+
         async function fetchData(user) {
             const userId = resolveUserId(user);
             try {
                 await client.connect();
 
                 const db = client.db(dbName);
+
                 const collectionName = getTopCollectionName(userId);
                 if (!collectionName) {
                     console.error('Unknown user:', user);
@@ -135,7 +126,20 @@ module.exports = {
             }
         }
 
-        async function compareSongs(file1, file2, user) {
+        // Normalize values for comparison (handle string/number and whitespace)
+        function normalizeRating(rating) {
+            if (rating == null) return null;
+            const str = String(rating).trim();
+            const num = parseFloat(str);
+            return isNaN(num) ? str : num;
+        }
+
+        function normalizeAchv(achv) {
+            if (achv == null) return null;
+            return String(achv).trim();
+        }
+
+        async function compareSongs(file1, file2, userId) {
             let new_records = [];
 
             const data1 = JSON.parse(file1);
@@ -147,19 +151,6 @@ module.exports = {
             rating_diff = rating1 - rating2;
             const prefix = rating_diff >= 0 ? '+' : '-';
             const rating_diff_str = '(' + prefix + Math.abs(rating_diff).toString() + 'rt)';
-
-            // Normalize values for comparison (handle string/number and whitespace)
-            function normalizeRating(rating) {
-                if (rating == null) return null;
-                const str = String(rating).trim();
-                const num = parseFloat(str);
-                return isNaN(num) ? str : num;
-            }
-
-            function normalizeAchv(achv) {
-                if (achv == null) return null;
-                return String(achv).trim();
-            }
 
             const missingInFile2New = data1.new.filter((entry) => {
                 const correspondingEntry = data2.new.find(
@@ -239,11 +230,23 @@ module.exports = {
             } else {
                 console.log('All songs in file1 are also present in file2.');
             }
-            if (new_records.length === 0) {
-            } else {
-                const [user_img_src, user_name, user_rating] = await getUserInfo(user);
-                const MAX_FIELDS = 25;
+            const [user_img_src, user_name, user_rating] = await getUserInfo(userId);
+            const MAX_FIELDS = 25;
 
+            if (new_records.length === 0) {
+                // Special case: always show Ryan's rating even if there are no per-song changes
+                if (userId === 'ryan') {
+                    const embed = new EmbedBuilder().setColor(0x7289da).setAuthor({
+                        name: `${user_name} ${user_rating}rt ${rating_diff_str}`,
+                        iconURL: user_img_src,
+                    });
+                    embed.addFields({
+                        name: ' ',
+                        value: 'No individual top song changes today.',
+                    });
+                    channel.send({ embeds: [embed] });
+                }
+            } else {
                 for (let i = 0; i < new_records.length; i += MAX_FIELDS) {
                     const chunk = new_records.slice(i, i + MAX_FIELDS);
 
@@ -266,8 +269,11 @@ module.exports = {
                 await client.connect();
 
                 const db = client.db(dbName);
+
                 const collection = db.collection('user_info');
-                const cursor = collection.find({ user: userId }).sort({ _id: -1 }).limit(1);
+                const userKey = userId == null ? '' : String(userId);
+
+                const cursor = collection.find({ user: userKey }).sort({ _id: -1 }).limit(1);
                 const documents = await cursor.toArray();
                 const document = documents[0];
 
@@ -289,13 +295,11 @@ module.exports = {
     },
 };
 
-// allow running without a Discord channel by providing a fake channel that logs
 module.exports.runStandalone = async function () {
     const outputs = [];
     const fakeChannel = {
         send: (payload) => {
             try {
-                // normalize embeds to plain JSON
                 if (payload && Array.isArray(payload.embeds)) {
                     const embeds = payload.embeds.map((e) => (typeof e.toJSON === 'function' ? e.toJSON() : e));
                     outputs.push({ embeds });

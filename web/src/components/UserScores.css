@@ -1,0 +1,656 @@
+.user-scores-root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scores-board {
+  background: radial-gradient(circle at top, rgba(74, 39, 140, 0.97), rgba(8, 6, 24, 0.98));
+  padding: 10px 12px 16px;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Desktop: fixed 1200px so card size matches preview and icons are readable */
+@media (min-width: 1280px) {
+  .scores-board {
+    width: 1200px;
+    max-width: 1200px;
+  }
+}
+
+/* Fixed layout for download/preview: same on desktop and mobile, no gradient banding */
+.scores-board.scores-board-export {
+  width: 1200px;
+  max-width: 1200px;
+  transform: none;
+  flex-shrink: 0;
+  background: #252038;
+}
+
+.scores-board.scores-board-export .scores-layout {
+  grid-template-columns: minmax(0, 1fr) 210px;
+}
+
+/* Force 5-column grid when capturing (overrides mobile 2/3 columns) */
+.scores-board.scores-board-export .scores-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* Force 4:3 box for capture so song images are not stretched */
+.scores-board.scores-board-export .card-image-container {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 75%;
+  overflow: hidden;
+  background: #2a2340;
+}
+
+.scores-board.scores-board-export .card-image-container .song-image-wrap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.scores-board.scores-board-export .card-image-container .song-thumb,
+.scores-board.scores-board-export .card-image-container .song-thumb.placeholder,
+.scores-board.scores-board-export .card-image-container .song-image-wrap .song-thumb,
+.scores-board.scores-board-export .card-image-container .song-image-wrap .song-thumb.placeholder {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.scores-board.scores-board-export .card-image-container .overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.scores-board.scores-board-export .card-image-container::after {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.user-scores {
+  animation: fadeIn 0.3s ease-in;
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header – mimic maimai banner */
+.scores-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.95));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.scores-header h2 {
+  margin: 0;
+  font-size: 1.65rem;
+}
+
+.rating-display {
+  margin: 4px 0 0 0;
+  font-size: 1.1rem;
+}
+
+.rating-display span {
+  color: #ffe082;
+  font-weight: 700;
+}
+
+.header-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+/* Date + meta row */
+.scores-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.scores-controls label {
+  opacity: 0.85;
+}
+
+.date-input {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(10, 10, 25, 0.7);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: #ffe082;
+}
+
+.scores-info {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 16px;
+  font-size: 1.05rem;
+}
+
+.scores-info p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.scores-info strong {
+  color: #ffe082;
+}
+
+/* Sections – New / Previous */
+.scores-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.section-title {
+  background: linear-gradient(135deg, #f48fb1 0%, #7e57c2 100%);
+  color: white;
+  margin: 0 0 8px 0;
+  padding: 6px 10px;
+  font-size: 1rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.scores-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.scores-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* Song cards – purple grid like screenshot */
+.score-card {
+  background: transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.score-card.empty {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+  min-height: 110px;
+}
+
+.score-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(102, 126, 234, 0.8);
+}
+
+.card-image-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3; /* keep game-like 4:3 cards */
+  overflow: hidden;
+  background: radial-gradient(circle at top left, #7e57c2, #1b1b2f);
+}
+
+.card-image-container .song-image-wrap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.card-image-container .song-thumb,
+.card-image-container .song-image-wrap .song-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  margin: 0;
+  display: block;
+}
+
+.card-image-container .song-thumb.placeholder,
+.card-image-container .song-image-wrap .song-thumb.placeholder {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: radial-gradient(circle at center, #424874, #15152b);
+}
+
+.card-image-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+  background: rgba(0, 0, 0, 0.4); /* darken song images ~20% */
+  z-index: 1;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 6px 8px 6px;
+}
+
+.card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+}
+
+.song-index {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffe082;
+  font-weight: 600;
+}
+
+.difficulty-badge {
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: white;
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+}
+
+.overlay-text {
+  margin-top: auto;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.song-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-details {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+  font-size: 0.76rem;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.detail-row .label {
+  color: #cfd8dc;
+  font-size: 0.72rem;
+}
+
+.detail-row .value {
+  font-weight: 600;
+  font-size: 0.76rem;
+}
+
+.level-badge {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 5px;
+  border-radius: 6px;
+}
+
+.achv {
+  color: #ffe082 !important;
+}
+
+.rank-badge {
+  padding: 1px 5px;
+  border-radius: 6px;
+  color: #000 !important;
+  font-weight: 700;
+  text-align: center;
+  font-size: 0.76rem !important;
+}
+
+.card-rating {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
+.rating-value {
+  color: #ffe082;
+  font-weight: 700;
+}
+
+.rating-achv {
+  color: #ffe082;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.rating-rank {
+  text-align: right;
+}
+
+.no-scores {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 20px;
+  color: #b0bec5;
+}
+
+.scores-loading,
+.scores-error,
+.scores-empty {
+  text-align: center;
+  padding: 40px;
+  font-size: 1.1rem;
+  color: #b0bec5;
+}
+
+.scores-error {
+  background: rgba(244, 67, 54, 0.12);
+  color: #ffcdd2;
+  border-radius: 8px;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.scores-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.download-btn {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(33, 33, 66, 0.9);
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s ease-out, transform 0.1s ease-out, box-shadow 0.15s;
+}
+
+.download-btn:hover {
+  background: rgba(81, 132, 255, 0.9);
+  box-shadow: 0 4px 10px rgba(81, 132, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.download-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.history-panel {
+  background: rgba(10, 10, 30, 0.95);
+  border-radius: 12px;
+  padding: 8px 10px 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7);
+  font-size: 0.8rem;
+  min-height: min(60vh, 400px);
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-title {
+  margin: 0 0 6px 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.02);
+  color: #eceff1;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.history-item:hover {
+  background: rgba(120, 144, 156, 0.3);
+}
+
+.history-date {
+  font-family: monospace;
+}
+
+.history-rating {
+  font-weight: 700;
+  color: #ffe082;
+}
+
+/* Tablet / narrow desktop: 3 columns so cards are larger */
+@media (max-width: 768px) {
+  .scores-board {
+    padding: 8px 10px 12px;
+    margin: 0 4px;
+  }
+
+  .scores-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .scores-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .header-avatar {
+    width: 56px;
+    height: 56px;
+  }
+
+  .scores-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .scores-info {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .scores-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scores-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .history-panel {
+    min-height: 280px;
+    max-height: 50vh;
+  }
+}
+
+/* Mobile: 3 columns per row */
+@media (max-width: 480px) {
+  .scores-board {
+    padding: 6px 8px 10px;
+    margin: 0 2px;
+  }
+
+  .scores-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .rating-display {
+    font-size: 0.9rem;
+  }
+
+  .header-avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .scores-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .score-card .overlay {
+    padding: 4px 4px 6px;
+  }
+
+  .card-top-row {
+    font-size: 0.6rem;
+  }
+
+  .card-rating {
+    padding: 2px 6px;
+    font-size: 0.62rem;
+  }
+
+  .rating-achv {
+    font-size: 0.58rem;
+  }
+
+  .rating-rank.rank-badge {
+    font-size: 0.58rem !important;
+  }
+
+  .history-panel {
+    min-height: 240px;
+    max-height: 45vh;
+  }
+
+  .history-item {
+    padding: 8px 10px;
+    min-height: 44px;
+  }
+}
+
+/* Preview modal (mobile: avoid popup block; same desktop-style image as download) */
+.preview-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow: auto;
+}
+
+.preview-modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.preview-modal-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.preview-modal-close {
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(81, 132, 255, 0.9);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+/* When capturing (export): force 5-column desktop layout on any viewport (mobile preview/download) */
+.scores-board.scores-board-export .scores-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 6px;
+}

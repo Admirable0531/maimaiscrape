@@ -1,14 +1,14 @@
-version: "3.9"
-
 services:
+  # Discord bot: cron is ON — daily at 23:00 it POSTs /run-update-score to the API
   bot:
     build:
-      context: ./Discord_Bot
+      context: .
+      dockerfile: Discord_Bot/Dockerfile
     container_name: discord_bot
     env_file:
       - .env
-    volumes:
-      - ./Discord_Bot:/app
+    # volumes:
+    #   - ./Discord_Bot:/app
     working_dir: /app
     command: ["node", "."]
     depends_on:
@@ -44,22 +44,63 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Puppeteer user-data scraper: runs daily at RUN_AT (default 22:45) via node-cron
   scraper:
     build:
       context: .
-    container_name: selenium_scraper
+      dockerfile: Dockerfile.scraper
+    container_name: puppeteer_scraper
     depends_on:
       - mongodb
     env_file:
       - .env
     environment:
       - TZ=Asia/Kuala_Lumpur
-      - USE_XVFB=1
+      # RUN_AT=HH:MM (24h) for daily scrape; default 22:45
+      - RUN_AT=${RUN_AT:-22:45}
     volumes:
-      - ./screenshots:/app/screenshots
       - /dev/shm:/dev/shm
     working_dir: /app
-    command: ["python", "-u", "/app/update_user_data.py"]
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: .
+      dockerfile: Discord_Bot/Dockerfile
+    container_name: express_api
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+    working_dir: /app
+    command: ["node", "server/express_server.js"]
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Kuala_Lumpur
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    container_name: maimai_web
+    ports:
+      - "5173:5173"
+    environment:
+      - TZ=Asia/Kuala_Lumpur
+    depends_on:
+      - api
     restart: unless-stopped
     logging:
       driver: "json-file"

@@ -608,7 +608,6 @@ if __name__ == "__main__":
     load_dotenv()
     run_at = os.getenv("RUN_AT", DEFAULT_RUN_AT)
     print(f"[main] starting — immediate run + scheduled run at {run_at}", flush=True)
-    update()
     schedule.every().day.at(run_at).do(update)
     while True:
         schedule.run_pending()

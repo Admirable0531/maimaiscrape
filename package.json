@@ -1,0 +1,16 @@
+{
+  "name": "maimaiscrape",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Maimai score scraper and API",
+  "scripts": {
+    "migrate": "node server/scripts/migrate-collections-to-friend-idx.js",
+    "scraper": "node server/update_user_data.js",
+    "run-scraper": "node server/update_user_data.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mongodb": "^6.5.0",
+    "puppeteer": "^23.11.1"
+  }
+}
