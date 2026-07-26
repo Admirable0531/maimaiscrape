@@ -23,6 +23,13 @@ wheels/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
+
+# The generic "lib/" rule above (from Python's .gitignore template) also
+# matches Discord_Bot/lib/, our shared JS helper modules (mongo, webhook,
+# format, maimai_session). Un-ignore that specific directory: the dir itself
+# must be re-included before git will look at files inside it.
+!Discord_Bot/lib/
+!Discord_Bot/lib/**
 *.egg
 MANIFEST
 
