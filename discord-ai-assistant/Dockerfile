@@ -7,14 +7,39 @@ FROM node:22-bullseye
 # better-sqlite3 is a native module — it ships prebuilt binaries for common
 # platforms, but python3/make/g++ are the fallback if no prebuild matches
 # this image's Node/arch combo (e.g. a Pi's arm64), so the install doesn't
-# just fail there.
+# just fail there. Chromium + its runtime libs are here too, for
+# maimaiAccountSession.js (this tracked account's authenticated maimai DX
+# NET browsing) — it unconditionally launches a real browser via Playwright,
+# and Playwright's OWN downloaded build doesn't support arm64 Debian at all
+# ("ERROR: Playwright does not support chromium on debian11-arm64" —
+# confirmed live on the Pi), so this uses the same fix Discord_Bot/Dockerfile
+# and server/update_user_data.js already use for the identical problem on
+# this same hardware: apt's own Chromium build + an explicit executablePath
+# in maimaiAccountSession.js, skipping Playwright's downloader entirely.
 RUN apt-get update && apt-get install -y \
   python3 \
   make \
   g++ \
+  chromium \
+  fonts-liberation \
+  libappindicator3-1 \
+  libasound2 \
+  libatk-bridge2.0-0 \
+  libatk1.0-0 \
+  libcups2 \
+  libdbus-1-3 \
+  libgdk-pixbuf2.0-0 \
+  libnspr4 \
+  libnss3 \
+  libxss1 \
+  xdg-utils \
   --no-install-recommends && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
+# Playwright's postinstall normally tries to download its own browser build —
+# skip it, since the system Chromium above is what actually gets used.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV CHROME_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
@@ -34,17 +59,9 @@ RUN rm -f node_modules/better-sqlite3/prebuilds/linux-arm64.node && \
 
 COPY . .
 
-# read_webpage's Playwright fallback (ENABLE_PLAYWRIGHT_FALLBACK) needs a
-# Chromium binary this image doesn't ship by default — the .env.example
-# already recommends leaving that flag off on a Pi 4 (a resident Chromium
-# process is 200MB+ of RAM), so this image stays lean by default. To enable
-# it anyway: uncomment the two lines below (adds Chromium + its system deps,
-# a few hundred MB) and rebuild.
-# RUN npx playwright install --with-deps chromium
-
 # The official Node image's non-root "node" user is what lets Playwright's
-# Chromium sandbox actually work if you do enable the fallback above — the
-# sandbox is deliberately left on in playwrightFetcher.js (not disabled via
+# Chromium sandbox actually work — the sandbox is deliberately left on in
+# both playwrightFetcher.js and maimaiAccountSession.js (not disabled via
 # --no-sandbox), and Chromium refuses to sandbox when running as root.
 RUN mkdir -p /app/data && chown -R node:node /app
 USER node

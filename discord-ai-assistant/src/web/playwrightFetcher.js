@@ -1,6 +1,20 @@
 const { chromium } = require('playwright');
+const fs = require('fs');
 const { assertSafeUrl } = require('./urlSafety');
 const logger = require('../utils/logger');
+
+// Same arm64-Debian gap as maimaiAccountSession.js — see its own comment for
+// the confirmed live error. Kept as a separate copy rather than a shared
+// import since this file has no other dependency on that module.
+function resolveExecutablePath() {
+    let executablePath = process.env.CHROME_EXECUTABLE_PATH || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+    const isArmLinux = process.platform === 'linux' && (process.arch === 'arm' || process.arch === 'arm64');
+    if (!executablePath && isArmLinux) {
+        const candidates = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
+        executablePath = candidates.find((p) => fs.existsSync(p));
+    }
+    return executablePath;
+}
 
 const NAV_TIMEOUT_MS = 20000;
 const USER_AGENT = 'Mozilla/5.0 (compatible; discord-ai-assistant/1.0)';
@@ -34,6 +48,7 @@ function scheduleIdleClose() {
 function getBrowser() {
     clearIdleTimer(); // in active use — cancel any pending auto-close
     if (!browserPromise) {
+        const executablePath = resolveExecutablePath();
         browserPromise = chromium.launch({
             headless: true,
             // /dev/shm is often tiny on constrained/containerized Linux
@@ -43,6 +58,7 @@ function getBrowser() {
             // left on — that's a real security boundary, not something to
             // drop just because the device is small.
             args: ['--disable-dev-shm-usage'],
+            ...(executablePath ? { executablePath } : {}),
         });
     }
     return browserPromise;

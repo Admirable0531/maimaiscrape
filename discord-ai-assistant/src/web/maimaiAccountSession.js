@@ -1,6 +1,22 @@
 const { chromium } = require('playwright');
+const fs = require('fs');
 const { assertSafeUrl } = require('./urlSafety');
 const logger = require('../utils/logger');
+
+// Playwright's own bundled Chromium build doesn't support arm64 Debian
+// (confirmed live: "Playwright does not support chromium on debian11-arm64"
+// on the Pi) — same problem Discord_Bot/lib/maimai_session.js already solves
+// for its Puppeteer browser, so resolve the system Chromium apt installs the
+// same way that file does, rather than relying on Playwright's downloader.
+function resolveExecutablePath() {
+    let executablePath = process.env.CHROME_EXECUTABLE_PATH || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+    const isArmLinux = process.platform === 'linux' && (process.arch === 'arm' || process.arch === 'arm64');
+    if (!executablePath && isArmLinux) {
+        const candidates = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
+        executablePath = candidates.find((p) => fs.existsSync(p));
+    }
+    return executablePath;
+}
 
 // Login flow ported from Discord_Bot/lib/maimai_session.js (Puppeteer,
 // proven working against the real site for the nightly scrapers) to
@@ -163,7 +179,13 @@ function getContext() {
     clearIdleTimer(); // in active use — cancel any pending auto-close
     if (!contextPromise) {
         contextPromise = (async () => {
-            const browser = await chromium.launch({ headless: true, args: ['--disable-dev-shm-usage'] });
+            const executablePath = resolveExecutablePath();
+            if (executablePath) logger.info('web', 'maimai account session using browser', { executablePath });
+            const browser = await chromium.launch({
+                headless: true,
+                args: ['--disable-dev-shm-usage'],
+                ...(executablePath ? { executablePath } : {}),
+            });
             const context = await browser.newContext({ userAgent: USER_AGENT });
             const page = await context.newPage();
             try {
