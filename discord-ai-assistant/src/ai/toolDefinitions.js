@@ -12,6 +12,7 @@ const listMaimaiAccountPagesTool = require('../tools/listMaimaiAccountPages');
 const getMaimaiSongPlayHistoryTool = require('../tools/getMaimaiSongPlayHistory');
 const getMaimaiScoreBreakdownTool = require('../tools/getMaimaiScoreBreakdown');
 const getMaimaiSongRatingTool = require('../tools/getMaimaiSongRating');
+const getMaimaiSongRankingTool = require('../tools/getMaimaiSongRanking');
 const { getAllowedScopes } = require('../permissions/permissionStore');
 
 const TOOLS = [
@@ -29,6 +30,7 @@ const TOOLS = [
     getMaimaiSongPlayHistoryTool,
     getMaimaiScoreBreakdownTool,
     getMaimaiSongRatingTool,
+    getMaimaiSongRankingTool,
 ];
 
 const GEMINI_TOOLS = [{ functionDeclarations: TOOLS.map((tool) => tool.declaration) }];
@@ -49,6 +51,7 @@ const TOOL_SCOPES = {
     list_maimai_remywiki_pages: 'web',
     list_maimai_account_pages: 'account',
     get_maimai_song_play_history: 'account',
+    get_maimai_song_ranking: 'account',
     get_friend_leaderboard: 'leaderboard',
     get_circle_rankings: 'leaderboard',
     search_memory: 'memory',
