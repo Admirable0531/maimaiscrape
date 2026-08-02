@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Deploy
         run: |
-          cd /home/ryan/Desktop/maimai/maimaiscrape
+          cd /home/ryan/Desktop/maimaiscrape
           git pull
           docker compose down
           docker compose up -d --build
