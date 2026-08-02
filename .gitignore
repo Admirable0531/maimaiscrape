@@ -30,6 +30,10 @@ share/python-wheels/
 # must be re-included before git will look at files inside it.
 !Discord_Bot/lib/
 !Discord_Bot/lib/**
+# Same problem, same fix, for server/lib/ (fetchBinary.js) — added when that
+# directory was introduced and silently swallowed by the same blanket rule.
+!server/lib/
+!server/lib/**
 *.egg
 MANIFEST
 
@@ -167,3 +171,5 @@ cython_debug/
 #.idea/
 
 node_modules
+# Debug screenshots from maimai_session.js's SCREENSHOT_DEBUG (see Discord_Bot/lib/maimai_session.js)
+screenshots/

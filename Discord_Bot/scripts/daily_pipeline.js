@@ -69,7 +69,21 @@ async function scrapeTopScores() {
  * accountType 'fy' writes friend_rating_daily_snapshots;
  * 'main' writes friend_rating_daily_snapshots_main.
  */
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function scrapeFriendList(accountType) {
+    // A short pause before logging in — the fy and main scrapes run back-to-
+    // back from the same container/IP, and a production run of this exact
+    // sequence has failed for `main` (empty friend list, no error) while an
+    // isolated manual replay of the identical login+scrape succeeded
+    // cleanly. Unproven root cause, but the timing match (fails only when
+    // immediately following another login from the same IP) makes rapid
+    // back-to-back SEGA logins a reasonable enough suspect to cheaply guard
+    // against; remove this if a future failure rules it out.
+    if (accountType === 'main') await delay(8000);
+
     const result = await friendsWebhook.run({ sendWebhook: false, saveToMongo: true, accountType });
     if (!result.ok) throw new Error(result.error || `${accountType} friend list scrape failed`);
     return `${result.friendsCount} friend ratings saved (${accountType})`;

@@ -4,7 +4,7 @@ const { SYSTEM_PROMPT } = require('../systemPrompt');
 const { GEMINI_TOOLS, createToolExecutors } = require('../toolDefinitions');
 const logger = require('../../utils/logger');
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 // Bounds the tool-call round-trip loop below so a model stuck calling tools
 // forever can't turn one Discord message into an unbounded number of Gemini
 // requests. This is a *starting* budget, not a hard wall — see

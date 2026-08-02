@@ -113,7 +113,16 @@ function getSnapshotCollectionName(accountType) {
 function getAccountCredentials(accountType) {
     const sid =
         accountType === 'main' ? config.MAIMAI_ACCOUNT_RATING_MAIN : config.MAIMAI_ACCOUNT_RATING_FY;
-    return { sid: sid || '', password: config.MAIMAI_PASSWORD_RATING || '' };
+    // MAIMAI_PASSWORD_RATING_MAIN is optional and falls back to the fy
+    // password — only set it if the main account actually uses a different
+    // one. Previously both accounts always shared MAIMAI_PASSWORD_RATING
+    // unconditionally, which silently breaks the main login if its real
+    // password differs (SEGA rejects it, friend list comes back empty).
+    const password =
+        accountType === 'main'
+            ? config.MAIMAI_PASSWORD_RATING_MAIN || config.MAIMAI_PASSWORD_RATING
+            : config.MAIMAI_PASSWORD_RATING;
+    return { sid: sid || '', password: password || '' };
 }
 
 /** Stores one document per calendar day, replacing any existing one for that day. */
@@ -194,11 +203,16 @@ async function run(opts = {}) {
     }
 
     const account = { ...credentials, label: accountType === 'main' ? 'MAIN' : 'FY' };
+    // Distinguishes fy vs main in logs/screenshots (e.g. maimai_session.js's
+    // console.log/screenshot prefixes) — previously both always logged as
+    // the literal "friends", so a production failure for one account
+    // couldn't be told apart from the other without re-running by hand.
+    const sessionLabel = `${LABEL}-${accountType}`;
 
     try {
         const friends = await withMaimaiSession({
             credentials,
-            label: LABEL,
+            label: sessionLabel,
             fallback: [],
             task: async (page, _browser, { shot }) => {
                 await page.goto(FRIEND_LIST_URL, { waitUntil: 'networkidle2', timeout: 60000 });
@@ -207,7 +221,7 @@ async function run(opts = {}) {
             },
         });
 
-        console.log(`[${LABEL}] collected ${friends.length} entries for ${account.label}`);
+        console.log(`[${sessionLabel}] collected ${friends.length} entries for ${account.label}`);
 
         if (friends.length === 0) {
             return { ok: false, error: 'no friends scraped', friendsCount: 0 };

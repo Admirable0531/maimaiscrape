@@ -5,10 +5,9 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
-const guildId = process.env.GUILD_ID;
 
 // Without these the REST call fails with an opaque 401/404, so check up front.
-const missing = Object.entries({ DISCORD_TOKEN: token, CLIENT_ID: clientId, GUILD_ID: guildId })
+const missing = Object.entries({ DISCORD_TOKEN: token, CLIENT_ID: clientId })
     .filter(([, value]) => !value)
     .map(([name]) => name);
 
@@ -38,9 +37,17 @@ for (const folder of fs.readdirSync(commandsRoot)) {
 (async () => {
     const rest = new REST().setToken(token);
     try {
-        console.log(`Started refreshing ${commands.length} application (/) commands.`);
-        const data = await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
-        console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+        // Global (not per-guild) so Atri's commands work in every server it's
+        // invited to without redeploying per server — this PUT atomically
+        // replaces the ENTIRE global command set, which is also how this
+        // cleared out 45 unrelated stale commands from a prior bot identity
+        // on this same application. Takes up to ~1hr to propagate to Discord
+        // clients after each change (guild-scoped commands update instantly,
+        // global ones don't — expected latency, not a bug if a new command
+        // doesn't show up immediately).
+        console.log(`Started refreshing ${commands.length} global application (/) command(s).`);
+        const data = await rest.put(Routes.applicationCommands(clientId), { body: commands });
+        console.log(`Successfully reloaded ${data.length} global application (/) command(s).`);
         for (const command of data) {
             console.log(`  /${command.name}`);
         }

@@ -2,9 +2,10 @@ const { fetchWebpage } = require('./webpageFetcher');
 const { fetchRendered } = require('./playwrightFetcher');
 const { loadDocument, extractMeta } = require('./htmlExtractor');
 const { splitIntoSections } = require('./sectionSplitter');
-const { webpageCache } = require('./cache');
+const { webpageCache, maimaiAccountCache } = require('./cache');
 const { getSiteConfig } = require('./siteConfig');
 const { parseFandomUrl, fetchFandomArticle } = require('./fandomApi');
+const { fetchAccountPage, MAIMAI_ACCOUNT_HOST, MAIMAI_ACCOUNT_PATH_PREFIX } = require('./maimaiAccountSession');
 const logger = require('../utils/logger');
 
 // Above this, read_webpage returns section previews instead of full text.
@@ -47,6 +48,10 @@ async function loadPage(requestedUrl) {
     // otherwise short-circuit there.
     if (parseFandomUrl(requestedUrl)) {
         return loadFandomPage(requestedUrl);
+    }
+
+    if (hostnameOf(requestedUrl).toLowerCase() === MAIMAI_ACCOUNT_HOST) {
+        return loadMaimaiAccountPage(requestedUrl);
     }
 
     const siteConfig = getSiteConfig(hostnameOf(requestedUrl));
@@ -155,6 +160,44 @@ async function loadFandomPage(requestedUrl) {
     };
 
     webpageCache.set(requestedUrl, page);
+    return page;
+}
+
+/**
+ * This tracked account's own maimaidx-eng.com/maimai-mobile/... pages —
+ * live, authenticated in-game data (rating, records, collection, friend
+ * list), fetched via maimaiAccountSession.js's shared logged-in session
+ * instead of the generic fetch/Playwright pipeline (nothing on that site is
+ * viewable without a real SEGA login). Cached separately from webpageCache
+ * with a much shorter TTL (see cache.js) since this reflects live gameplay,
+ * not a mostly-static article.
+ */
+async function loadMaimaiAccountPage(requestedUrl) {
+    const cached = maimaiAccountCache.get(requestedUrl);
+    if (cached) return cached;
+
+    const path = new URL(requestedUrl).pathname;
+    if (!path.startsWith(MAIMAI_ACCOUNT_PATH_PREFIX)) {
+        throw new Error(`Only paths under ${MAIMAI_ACCOUNT_PATH_PREFIX} are supported on maimaidx-eng.com.`);
+    }
+
+    const { html, finalUrl } = await fetchAccountPage(path);
+    const { $, images } = loadDocument(html, finalUrl);
+    const meta = extractMeta($, finalUrl);
+    const sections = meta.text.length > SECTION_THRESHOLD_CHARS ? splitIntoSections($) : null;
+
+    const page = {
+        url: finalUrl,
+        title: meta.title,
+        text: meta.text,
+        headings: meta.headings,
+        sections,
+        images,
+        renderedWithBrowser: true,
+    };
+
+    maimaiAccountCache.set(requestedUrl, page);
+    if (finalUrl !== requestedUrl) maimaiAccountCache.set(finalUrl, page);
     return page;
 }
 

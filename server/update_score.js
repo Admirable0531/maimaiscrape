@@ -1,7 +1,8 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const config = require('../Discord_Bot/config');
 const { getDb } = require('../Discord_Bot/lib/mongo');
 const { getTopCollectionName, getFriendIdxFromOldName } = require('./collectionNames');
+const { fetchBinary } = require('./lib/fetchBinary');
 
 const SONG_DB_URL = 'https://arcade-songs.zetaraku.dev/maimai/';
 const MAX_FIELDS_PER_EMBED = 25;
@@ -139,16 +140,40 @@ async function getUserInfo(db, userId) {
     }
 }
 
-/** Builds the per-user embeds. Returns [] when there is nothing worth posting. */
+/**
+ * Fetches a user's avatar server-side and returns it as a Discord
+ * attachment, instead of handing Discord the raw SEGA URL as iconURL.
+ *
+ * Confirmed live: SEGA now serves friend avatars in two different URL
+ * shapes, and one of them (.../img/Icon/friend/<id>) comes back with
+ * `Cache-Control: no-store` and a hard-expired `Expires` header — headers
+ * that make Discord's own embed-image fetcher fail to render a thumbnail,
+ * even though the URL returns a valid image to a direct fetch (verified).
+ * Fetching the bytes ourselves and attaching them sidesteps that entirely —
+ * Discord never has to re-fetch anything from SEGA.
+ */
+async function fetchAvatarAttachment(imgSrc) {
+    if (!imgSrc) return null;
+    try {
+        const { buffer, mime } = await fetchBinary(imgSrc);
+        const ext = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : 'jpg';
+        return new AttachmentBuilder(buffer, { name: `icon.${ext}` });
+    } catch (err) {
+        console.error('[update_score] avatar fetch failed, posting without an icon:', err.message);
+        return null;
+    }
+}
+
+/** Builds the per-user embeds plus a shared avatar attachment. Returns {embeds: [], attachment: null} when there is nothing worth posting. */
 async function buildUserEmbeds(db, userId) {
     const collectionName = getTopCollectionName(userId);
     if (!collectionName) {
         console.error('[update_score] unknown user:', userId);
-        return [];
+        return { embeds: [], attachment: null };
     }
 
     const pair = await loadSnapshotPair(db, collectionName);
-    if (!pair) return [];
+    if (!pair) return { embeds: [], attachment: null };
 
     const { current, previous } = pair;
     const ratingDiff = (current.rating ?? 0) - (previous.rating ?? 0);
@@ -160,17 +185,21 @@ async function buildUserEmbeds(db, userId) {
     ];
 
     const { imgSrc, name, rating } = await getUserInfo(db, userId);
-    const author = { name: `${name} ${rating}rt ${ratingDiffStr}`, iconURL: imgSrc || undefined };
+    const attachment = await fetchAvatarAttachment(imgSrc);
+    const author = { name: `${name} ${rating}rt ${ratingDiffStr}`, iconURL: attachment ? `attachment://${attachment.name}` : undefined };
 
     if (lines.length === 0) {
         // Always show Ryan so the daily post is never completely empty.
-        if (userId !== 'ryan') return [];
-        return [
-            new EmbedBuilder()
-                .setColor(0x7289da)
-                .setAuthor(author)
-                .addFields({ name: ' ', value: 'No individual top song changes today.' }),
-        ];
+        if (userId !== 'ryan') return { embeds: [], attachment: null };
+        return {
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0x7289da)
+                    .setAuthor(author)
+                    .addFields({ name: ' ', value: 'No individual top song changes today.' }),
+            ],
+            attachment,
+        };
     }
 
     const embeds = [];
@@ -181,7 +210,7 @@ async function buildUserEmbeds(db, userId) {
         }
         embeds.push(embed);
     }
-    return embeds;
+    return { embeds, attachment };
 }
 
 /**
@@ -210,9 +239,12 @@ async function execute(channel) {
     for (const user of users) {
         const userId = resolveUserId(user);
         try {
-            const embeds = await buildUserEmbeds(db, userId);
+            const { embeds, attachment } = await buildUserEmbeds(db, userId);
             for (const embed of embeds) {
-                await channel.send({ embeds: [embed] });
+                // Re-sent per message on purpose: attachment://<name> references only
+                // resolve within the same message, so a user with multiple embed
+                // pages needs the same bytes attached to each of them.
+                await channel.send({ embeds: [embed], files: attachment ? [attachment] : [] });
             }
         } catch (err) {
             console.error(`[update_score] failed for ${userId}:`, err.message);

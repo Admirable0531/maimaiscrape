@@ -199,7 +199,12 @@ async function getTopScore(page) {
 
 async function getRyanInfo(page, db, formattedDate) {
     await page.waitForSelector('.w_112.f_l', { visible: true, timeout: 60000 });
-    const user_img_src = await page.$eval('.w_112.f_l', (el) => el.getAttribute('src'));
+    // Friends' extraction already falls back to the resolved `.src` (see
+    // collectPageFriends below) for pages where getAttribute('src') is
+    // relative or briefly empty pre-hydration — this path was missing that
+    // fallback, which would silently store a bad/empty img_src with no
+    // error anywhere in the pipeline.
+    const user_img_src = await page.$eval('.w_112.f_l', (el) => el.getAttribute('src') || el.src || null);
     const user_name = await page.$eval('.name_block.f_l.f_16', (el) => el.textContent.trim());
     const user_rating = await page.$eval('.rating_block', (el) => el.textContent.trim());
     const ryan_user_data = {

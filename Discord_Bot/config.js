@@ -64,6 +64,9 @@ module.exports = {
     MAIMAI_ACCOUNT_RATING_FY: process.env.MAIMAI_ACCOUNT_RATING_FY || '',
     MAIMAI_ACCOUNT_RATING_MAIN: process.env.MAIMAI_ACCOUNT_RATING_MAIN || '',
     MAIMAI_PASSWORD_RATING: process.env.MAIMAI_PASSWORD_RATING || '',
+    // Optional — only needed if the main account's SEGA password differs
+    // from the fy account's. Falls back to MAIMAI_PASSWORD_RATING if unset.
+    MAIMAI_PASSWORD_RATING_MAIN: process.env.MAIMAI_PASSWORD_RATING_MAIN || '',
 
     FRIEND_WEBHOOK_URL_FY: process.env.FRIEND_WEBHOOK_URL_FY || '',
     FRIEND_WEBHOOK_URL_TEST: process.env.FRIEND_WEBHOOK_URL_TEST || '',
