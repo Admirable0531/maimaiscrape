@@ -1,0 +1,95 @@
+const logger = require('../utils/logger');
+const { getHistory, appendMessage } = require('../conversation/historyStore');
+const { generateReply } = require('../ai/agent');
+const { isAllowed, isOwner } = require('../permissions/permissionStore');
+const { tryHandleAdminCommand } = require('./adminCommands');
+
+const DISCORD_MESSAGE_LIMIT = 2000;
+
+/** userId -> last reply timestamp (ms). Simple in-memory cooldown, not persisted. */
+const lastReplyAtByUser = new Map();
+
+/**
+ * Trigger: DMs always respond; in a guild, only when the bot is @-mentioned.
+ * Replying to every message in every channel would be noisy and burn Gemini
+ * quota fast, so this is a deliberate default, not a spec requirement —
+ * easy to change if you want always-on channels instead.
+ */
+function shouldRespond(message, clientUserId) {
+    if (message.author.bot) return false;
+    if (!message.guild) return true;
+    return message.mentions.has(clientUserId);
+}
+
+function isOnCooldown(userId, cooldownMs) {
+    const last = lastReplyAtByUser.get(userId);
+    if (last === undefined) return false;
+    return Date.now() - last < cooldownMs;
+}
+
+/** Strips a leading bot mention so it doesn't pollute the prompt sent to Gemini. */
+function stripMention(content, clientUserId) {
+    return content.replace(new RegExp(`^<@!?${clientUserId}>\\s*`), '').trim();
+}
+
+function truncateForDiscord(text) {
+    if (text.length <= DISCORD_MESSAGE_LIMIT) return text;
+    return `${text.slice(0, DISCORD_MESSAGE_LIMIT - 20)}\n\n...(truncated)`;
+}
+
+function registerMessageHandler(client, config) {
+    client.on('messageCreate', async (message) => {
+        if (!shouldRespond(message, client.user.id)) return;
+
+        const userId = message.author.id;
+        if (!isAllowed(userId)) {
+            // No permission: ignore completely — no reply, no "you can't do
+            // that" message. Logged server-side only, for the owner's benefit.
+            logger.info('discord', `Ignoring ${message.author.tag} (${userId}) — no permission`);
+            return;
+        }
+
+        const userText = stripMention(message.content, client.user.id);
+        if (!userText) return;
+
+        if (isOwner(userId)) {
+            const adminReply = tryHandleAdminCommand(userText);
+            if (adminReply !== null) {
+                await message
+                    .reply({ content: adminReply, allowedMentions: { parse: [] } })
+                    .catch((err) => logger.error('discord', 'Could not send admin command reply', err));
+                return;
+            }
+        }
+
+        if (isOnCooldown(userId, config.replyCooldownMs)) {
+            logger.info('discord', `Ignoring message from ${message.author.tag} (cooldown)`);
+            return;
+        }
+        lastReplyAtByUser.set(userId, Date.now());
+
+        const channelId = message.channel.id;
+        const guildId = message.guild?.id || null;
+        const history = getHistory(channelId);
+
+        try {
+            await message.channel.sendTyping().catch(() => {});
+            const reply = await generateReply(history, userText, { userId, guildId });
+
+            appendMessage({ userId, guildId, channelId, role: 'user', content: userText });
+            appendMessage({ userId, guildId, channelId, role: 'assistant', content: reply });
+
+            await message.reply({
+                content: truncateForDiscord(reply),
+                allowedMentions: { repliedUser: false },
+            });
+        } catch (err) {
+            logger.error('discord', `Failed to answer ${message.author.tag}`, err);
+            await message
+                .reply('Sorry, something went wrong answering that. Please try again in a moment.')
+                .catch((replyErr) => logger.error('discord', 'Could not send error reply', replyErr));
+        }
+    });
+}
+
+module.exports = { registerMessageHandler };

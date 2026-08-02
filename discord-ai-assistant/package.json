@@ -1,0 +1,23 @@
+{
+  "name": "discord-ai-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Discord bot with Gemini 2.5 Flash chat, web research, and long-term memory (Phase 1: chat only)",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.15.0",
+    "better-sqlite3": "^13.0.2",
+    "cheerio": "^1.2.0",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.45.2",
+    "playwright": "^1.62.1"
+  }
+}

@@ -11,6 +11,8 @@ const { getTopCollectionName } = require('./collectionNames');
 const { getDb, closeMongo } = require('../Discord_Bot/lib/mongo');
 
 const friendsWebhook = require('../Discord_Bot/scripts/friends_webhook');
+const { sortRankings } = require('../Discord_Bot/scripts/circle_ranking_scraper');
+const { parseRatingToNumber } = require('../Discord_Bot/lib/format');
 
 const app = express();
 app.use(express.json());
@@ -214,6 +216,67 @@ app.get('/users/:username/top-history', async (req, res) => {
     } catch (err) {
         console.error('[server] /users/:username/top-history error:', err);
         res.status(500).json({ error: String(err) });
+    }
+});
+
+// ---- Read-only stats endpoints for the discord-ai-assistant bot ----
+// (../discord-ai-assistant/src/tools/getFriendLeaderboard.js and
+// getCircleRankings.js) — same collections and helpers the existing
+// /latestfriendsleaderboard and /latestcirclerankings slash commands read,
+// just as JSON instead of a Discord embed. Read-only: no writes, no
+// scraper trigger.
+
+function getFriendSnapshotCollectionName(accountType) {
+    return accountType === 'main' ? 'friend_rating_daily_snapshots_main' : 'friend_rating_daily_snapshots';
+}
+
+app.get('/api/friends-leaderboard', async (req, res) => {
+    try {
+        const accountType = req.query.accountType === 'main' ? 'main' : 'fy';
+        const db = await getDatabase();
+        const collection = db.collection(getFriendSnapshotCollectionName(accountType));
+
+        const latest = await collection.findOne({}, { sort: { snapshotDate: -1 } });
+        if (!latest) {
+            return res.status(404).json({ success: false, error: 'No friend rating snapshot found' });
+        }
+
+        const friends = (Array.isArray(latest.friends) ? latest.friends : [])
+            .map((f) => ({
+                friendIdx: f.friendIdx,
+                name: f.name,
+                rating: f.rating != null ? parseRatingToNumber(f.rating) : parseRatingToNumber(f.ratingText),
+            }))
+            .filter((f) => f.friendIdx && f.rating != null)
+            .sort((a, b) => b.rating - a.rating)
+            .map((f, index) => ({ rank: index + 1, ...f }));
+
+        res.json({ success: true, accountType, snapshotDate: latest.snapshotDate, friends });
+    } catch (err) {
+        console.error('[server] /api/friends-leaderboard error:', err);
+        res.status(500).json({ success: false, error: String(err) });
+    }
+});
+
+app.get('/api/circle-rankings', async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+        const db = await getDatabase();
+        const collection = db.collection('circle_rankings');
+
+        const latest = await collection.findOne({}, { sort: { scrapedAt: -1 } });
+        if (!latest?.rankings?.length) {
+            return res.status(404).json({ success: false, error: 'No circle rankings found' });
+        }
+
+        const rankings = sortRankings(latest.rankings)
+            .slice(0, limit)
+            .map((r, index) => ({ rank: index + 1, groupName: r.groupName, points: r.points }));
+
+        res.json({ success: true, scrapedAt: latest.scrapedAt, rankings });
+    } catch (err) {
+        console.error('[server] /api/circle-rankings error:', err);
+        res.status(500).json({ success: false, error: String(err) });
     }
 });
 
