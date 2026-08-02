@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Test script to show divider examples
-const config = require('./Discord_Bot/config');
+const config = require('../../Discord_Bot/config');
 
 function showDividerExamples() {
     console.log('=== CIRCLE RANKING DIVIDER EXAMPLES ===\n');

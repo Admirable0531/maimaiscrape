@@ -1,6 +1,0 @@
-selenium>=4.8.0
-pymongo
-python-dotenv
-beautifulsoup4
-pyvirtualdisplay
-schedule

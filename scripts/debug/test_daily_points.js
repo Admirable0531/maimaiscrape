@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Test script for daily points tracker
-const dailyPointsTracker = require('./Discord_Bot/scripts/daily_points_tracker');
+const dailyPointsTracker = require('../../Discord_Bot/scripts/daily_points_tracker');
 
 async function test() {
     console.log('Testing daily points tracker...');

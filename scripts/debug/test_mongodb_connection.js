@@ -2,7 +2,7 @@
 
 // Test script for MongoDB connection in latestcirclerankings command
 const { MongoClient } = require('mongodb');
-const config = require('./Discord_Bot/config');
+const config = require('../../Discord_Bot/config');
 
 async function testMongoConnection() {
     console.log('Testing MongoDB connection for latestcirclerankings command...\n');

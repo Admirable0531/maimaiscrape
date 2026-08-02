@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Test script for circle ranking scraper
-const circleRankingScraper = require('./Discord_Bot/scripts/circle_ranking_scraper');
+const circleRankingScraper = require('../../Discord_Bot/scripts/circle_ranking_scraper');
 
 async function test() {
     console.log('Testing circle ranking scraper...');

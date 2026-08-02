@@ -2,7 +2,7 @@
 
 // Test script to verify circle ranking formatting
 const { MongoClient } = require('mongodb');
-const config = require('./Discord_Bot/config');
+const config = require('../../Discord_Bot/config');
 
 async function testFormatting() {
     console.log('Testing circle ranking formatting...\n');
