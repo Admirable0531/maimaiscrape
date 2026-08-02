@@ -42,7 +42,8 @@ function registerMessageHandler(client, config) {
         if (!shouldRespond(message, client.user.id)) return;
 
         const userId = message.author.id;
-        if (!isAllowed(userId)) {
+        const guildId = message.guild?.id || null;
+        if (!isAllowed(userId, guildId)) {
             // No permission: ignore completely — no reply, no "you can't do
             // that" message. Logged server-side only, for the owner's benefit.
             logger.info('discord', `Ignoring ${message.author.tag} (${userId}) — no permission`);
@@ -53,7 +54,7 @@ function registerMessageHandler(client, config) {
         if (!userText) return;
 
         if (isOwner(userId)) {
-            const adminReply = tryHandleAdminCommand(userText);
+            const adminReply = tryHandleAdminCommand(userText, guildId);
             if (adminReply !== null) {
                 await message
                     .reply({ content: adminReply, allowedMentions: { parse: [] } })
@@ -69,7 +70,6 @@ function registerMessageHandler(client, config) {
         lastReplyAtByUser.set(userId, Date.now());
 
         const channelId = message.channel.id;
-        const guildId = message.guild?.id || null;
         const history = getHistory(channelId);
 
         try {

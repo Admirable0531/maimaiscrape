@@ -24,6 +24,12 @@ const VALID_SCOPES = ['web', 'account', 'leaderboard', 'memory'];
  * specific scopes they're limited to. A user is in at most one of these at
  * a time — granting scoped access to someone with full access downgrades
  * them (see allowUser), since "full but also limited" isn't meaningful.
+ *
+ * allowedGuildIds/scopedGuildIds mirror that same pair, but grant access to
+ * every member of a server at once rather than one user — a member's actual
+ * access is the UNION of their personal grant (if any) and their server's
+ * grant (see getAllowedScopes), so a server-wide "web" grant plus one
+ * member's personal "leaderboard" grant gives that member both.
  */
 function loadStore() {
     try {
@@ -35,12 +41,17 @@ function loadStore() {
                 parsed.scopedUserIds && typeof parsed.scopedUserIds === 'object' && !Array.isArray(parsed.scopedUserIds)
                     ? parsed.scopedUserIds
                     : {},
+            allowedGuildIds: Array.isArray(parsed.allowedGuildIds) ? parsed.allowedGuildIds : [],
+            scopedGuildIds:
+                parsed.scopedGuildIds && typeof parsed.scopedGuildIds === 'object' && !Array.isArray(parsed.scopedGuildIds)
+                    ? parsed.scopedGuildIds
+                    : {},
         };
     } catch (err) {
         if (err.code !== 'ENOENT') {
             logger.error('permissions', `Failed to read ${STORE_PATH}, starting empty`, err);
         }
-        return { allowedUserIds: [], scopedUserIds: {} };
+        return { allowedUserIds: [], scopedUserIds: {}, allowedGuildIds: [], scopedGuildIds: {} };
     }
 }
 
@@ -59,19 +70,32 @@ function isOwner(userId) {
     return userId === getOwnerId();
 }
 
-function isAllowed(userId) {
-    return isOwner(userId) || store.allowedUserIds.includes(userId) || Boolean(store.scopedUserIds[userId]);
+function getGuildScopes(guildId) {
+    if (!guildId) return [];
+    if (store.allowedGuildIds.includes(guildId)) return 'all';
+    return store.scopedGuildIds[guildId] || [];
+}
+
+function isAllowed(userId, guildId) {
+    if (isOwner(userId) || store.allowedUserIds.includes(userId) || Boolean(store.scopedUserIds[userId])) return true;
+    const guildScopes = getGuildScopes(guildId);
+    return guildScopes === 'all' || guildScopes.length > 0;
 }
 
 /**
- * 'all' for the owner or a fully-allowed user, an array of granted scope
- * names for a scoped user, or [] for no access at all. Callers gating a
- * specific tool should treat 'all' as "every scope granted" rather than
- * comparing arrays.
+ * 'all' for the owner, a fully-allowed user, or a fully-allowed guild; an
+ * array of granted scope names (the union of the user's own grant and their
+ * server's grant, if any) for anyone scoped; or [] for no access at all.
+ * Callers gating a specific tool should treat 'all' as "every scope
+ * granted" rather than comparing arrays.
  */
-function getAllowedScopes(userId) {
+function getAllowedScopes(userId, guildId) {
     if (isOwner(userId) || store.allowedUserIds.includes(userId)) return 'all';
-    return store.scopedUserIds[userId] || [];
+    const guildScopes = getGuildScopes(guildId);
+    if (guildScopes === 'all') return 'all';
+    const userScopes = store.scopedUserIds[userId] || [];
+    if (userScopes.length === 0 && guildScopes.length === 0) return [];
+    return [...new Set([...userScopes, ...guildScopes])];
 }
 
 /**
@@ -105,11 +129,45 @@ function revokeUser(userId) {
     return had;
 }
 
+/** Same semantics as allowUser, but grants every member of `guildId` access at once. */
+function allowGuild(guildId, scopes = null) {
+    if (scopes === null) {
+        const isNew = !store.allowedGuildIds.includes(guildId);
+        delete store.scopedGuildIds[guildId];
+        if (isNew) store.allowedGuildIds.push(guildId);
+        saveStore(store);
+        return isNew;
+    }
+
+    const isNew = !store.scopedGuildIds[guildId] && !store.allowedGuildIds.includes(guildId);
+    store.allowedGuildIds = store.allowedGuildIds.filter((id) => id !== guildId);
+    store.scopedGuildIds[guildId] = scopes;
+    saveStore(store);
+    return isNew;
+}
+
+/** Returns true if the guild's grant was removed, false if it didn't have one. Individual members' own grants are untouched. */
+function revokeGuild(guildId) {
+    const had = store.allowedGuildIds.includes(guildId) || Boolean(store.scopedGuildIds[guildId]);
+    store.allowedGuildIds = store.allowedGuildIds.filter((id) => id !== guildId);
+    delete store.scopedGuildIds[guildId];
+    if (had) saveStore(store);
+    return had;
+}
+
 /** { full: userId[], scoped: {id, scopes}[] } — owner always included in full. */
 function listAllowedUsers() {
     return {
         full: [getOwnerId(), ...store.allowedUserIds],
         scoped: Object.entries(store.scopedUserIds).map(([id, scopes]) => ({ id, scopes })),
+    };
+}
+
+/** { full: guildId[], scoped: {id, scopes}[] } */
+function listAllowedGuilds() {
+    return {
+        full: [...store.allowedGuildIds],
+        scoped: Object.entries(store.scopedGuildIds).map(([id, scopes]) => ({ id, scopes })),
     };
 }
 
@@ -119,6 +177,9 @@ module.exports = {
     allowUser,
     revokeUser,
     listAllowedUsers,
+    allowGuild,
+    revokeGuild,
+    listAllowedGuilds,
     getAllowedScopes,
     getOwnerId,
     VALID_SCOPES,

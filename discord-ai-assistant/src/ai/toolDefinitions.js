@@ -84,7 +84,7 @@ function requiredScope(toolName, args) {
  * access to the calling user; see searchMemory.js / saveMemory.js.
  */
 function createToolExecutors(context) {
-    const scopes = getAllowedScopes(context.userId); // 'all' | string[]
+    const scopes = getAllowedScopes(context.userId, context.guildId); // 'all' | string[]
     const executors = {};
     for (const tool of TOOLS) {
         const name = tool.declaration.name;
