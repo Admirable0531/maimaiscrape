@@ -18,6 +18,39 @@ const TOOL_BUDGET_EXTEND_STEP = Number(process.env.DEEPSEEK_TOOL_BUDGET_EXTEND_S
 
 const REQUEST_MORE_TOOL_CALLS = 'request_more_tool_calls';
 
+// DeepSeek's own defaults (confirmed against the real API docs) are
+// thinking: {type: "enabled"} and reasoning_effort: "high" on every single
+// call — including "hi" and "what level is Titania". Valid reasoning_effort
+// values are only low/high/max (medium and xhigh are silently mapped to
+// high server-side), so there are exactly three real tiers to pick from.
+// Tools whose results need real interpretation (achievement-formula edge
+// cases, AP/AP+ badge logic, rating math) get bumped to "max" for the turn
+// that synthesizes their output; plain lookups stay at the default.
+const HEAVY_REASONING_TOOLS = new Set([
+    'get_maimai_score_breakdown',
+    'get_maimai_song_rating',
+    'get_maimai_song_ranking',
+    'get_maimai_friend_scores',
+]);
+// Deliberately narrow and conservative — only messages that are unambiguously
+// trivial (short greetings/acknowledgements with no question content) drop
+// to "low". A false "low" costs quality; a missed "low" just costs a few
+// cents, so this only fires on the clear-cut cases.
+const TRIVIAL_MESSAGE_PATTERN = /^(hi|hey|hello|yo|sup|thanks|thank you|ty|ok|okay|lol|lmao|nice|cool|k)[!.\s]*$/i;
+
+/** Picks a reasoning_effort for the very first call of a turn, before any tool has run — from the raw message only. */
+function estimateInitialEffort(userMessage) {
+    const trimmed = (userMessage || '').trim();
+    if (trimmed.length > 0 && trimmed.length <= 20 && TRIVIAL_MESSAGE_PATTERN.test(trimmed)) return 'low';
+    return 'high'; // DeepSeek's own default — safe middle ground when intent isn't yet known
+}
+
+/** Picks a reasoning_effort for a follow-up call, now that we know which tools the model actually reached for. */
+function estimateFollowUpEffort(toolCalls) {
+    const usedHeavyTool = toolCalls.some((call) => HEAVY_REASONING_TOOLS.has(call.function.name));
+    return usedHeavyTool ? 'max' : 'high';
+}
+
 /**
  * toolDefinitions.js's per-tool declarations ({name, description,
  * parametersJsonSchema}) are already provider-agnostic — only the outer
@@ -60,7 +93,7 @@ function toDeepseekMessages(history, userMessage) {
     ];
 }
 
-async function callDeepseek(messages, { toolChoice } = {}) {
+async function callDeepseek(messages, { toolChoice, reasoningEffort } = {}) {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) {
         throw new Error('DEEPSEEK_API_KEY is not set; cannot call DeepSeek.');
@@ -77,6 +110,9 @@ async function callDeepseek(messages, { toolChoice } = {}) {
                 tools: OPENAI_TOOLS,
                 tool_choice: toolChoice || 'auto',
                 max_tokens: MAX_OUTPUT_TOKENS,
+                // low | high | max — see the effort-estimation comment above.
+                // Omitted entirely falls back to DeepSeek's own default ("high").
+                ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
             }),
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
@@ -100,9 +136,13 @@ async function generateReply(history, userMessage, { userId, guildId }) {
     const executors = createToolExecutors({ userId, guildId });
     const messages = toDeepseekMessages(history, userMessage);
     let maxIterations = BASE_MAX_TOOL_ITERATIONS;
+    // Recomputed each iteration — starts from the raw message (nothing else
+    // to go on yet), then from iteration 2 onward reflects whichever tools
+    // the model actually reached for on the previous turn.
+    let reasoningEffort = estimateInitialEffort(userMessage);
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
-        const data = await callDeepseek(messages);
+        const data = await callDeepseek(messages, { reasoningEffort });
         const message = data.choices?.[0]?.message;
         const toolCalls = message?.tool_calls;
 
@@ -116,9 +156,11 @@ async function generateReply(history, userMessage, { userId, guildId }) {
             return text;
         }
 
+        reasoningEffort = estimateFollowUpEffort(toolCalls);
+
         logger.info(
             'agent',
-            `DeepSeek requested ${toolCalls.length} tool call(s): ${toolCalls.map((c) => c.function.name).join(', ')}`
+            `DeepSeek requested ${toolCalls.length} tool call(s): ${toolCalls.map((c) => c.function.name).join(', ')} (next effort: ${reasoningEffort})`
         );
 
         messages.push(message);
@@ -181,7 +223,7 @@ async function generateReply(history, userMessage, { userId, guildId }) {
         'agent',
         `Hit ${maxIterations} tool-call iterations without a final answer — forcing a text-only reply`
     );
-    const finalData = await callDeepseek(messages, { toolChoice: 'none' });
+    const finalData = await callDeepseek(messages, { toolChoice: 'none', reasoningEffort });
     const finalText = (finalData.choices?.[0]?.message?.content || '').trim();
     if (finalText) return finalText;
 
