@@ -1,6 +1,6 @@
 # Running commands inside Docker (e.g. over SSH on the Raspberry Pi)
 
-Run these from the project directory on the Pi (`~/Desktop/maimai/maimaiscrape`).
+Run these from the project directory on the Pi (`~/Desktop/maimaiscrape`).
 
 Images mirror the repository layout under `/app`, so paths are the same as in the
 repo: `Discord_Bot/...` and `server/...`.
@@ -74,7 +74,7 @@ Puppeteer's bundled build is x86 only:
 
 ```bash
 sudo apt update && sudo apt install chromium
-cd ~/Desktop/maimai/maimaiscrape
+cd ~/Desktop/maimaiscrape
 npm install
 HEADLESS=false DISPLAY=:0 MONGO_URI=mongodb://localhost:27017/mydatabase \
   node server/update_user_data.js
@@ -86,9 +86,14 @@ Windows):
 
 ```bash
 ssh -X pi@<pi-ip>
-cd ~/Desktop/maimai/maimaiscrape
+cd ~/Desktop/maimaiscrape
 HEADLESS=false npm run scraper
 ```
+
+## Debug scripts
+
+Ad-hoc manual verification scripts (not part of any automated suite) live in
+`scripts/debug/` — e.g. `node scripts/debug/test_mongodb_connection.js`.
 
 ## Migration (old name collections → friendIdx)
 

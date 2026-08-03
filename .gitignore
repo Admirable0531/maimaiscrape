@@ -173,3 +173,5 @@ cython_debug/
 node_modules
 # Debug screenshots from maimai_session.js's SCREENSHOT_DEBUG (see Discord_Bot/lib/maimai_session.js)
 screenshots/
+# Stray output from running something with `nohup` directly instead of through Docker
+nohup.out

@@ -114,10 +114,4 @@ web/                  Vite front-end
 Docker images mirror this layout under `/app`, so relative `require` paths behave
 identically inside and outside a container.
 
-## 🐍 Legacy Python
-
-`app.py`, `update_user_data.py`, `requirements.txt` and the root `Dockerfile` are the
-original Selenium/Firefox scraper. Nothing in `docker-compose.yml` references them —
-they are superseded by `server/update_user_data.js` (Puppeteer) and can be removed.
-
 See `DOCKER_COMMANDS.md` for manual/one-off runs.
