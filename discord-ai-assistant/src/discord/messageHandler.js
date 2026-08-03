@@ -98,7 +98,7 @@ function registerMessageHandler(client, config) {
         lastReplyAtByUser.set(userId, Date.now());
 
         const channelId = message.channel.id;
-        const history = getHistory(channelId);
+        const history = getHistory(channelId, userId);
 
         // Discord's typing indicator lasts ~10s and isn't auto-refreshed — a
         // single sendTyping() before a multi-tool-call generateReply() (which
