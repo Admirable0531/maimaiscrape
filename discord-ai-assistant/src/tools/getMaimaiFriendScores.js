@@ -17,11 +17,13 @@ const declaration = {
         "Get one of this tracked account's friends' actual scores (achievement %%) on every Master/Re:Master " +
         'chart at one exact difficulty constant (e.g. 14.3) — this is the "maimai bookmarklet"-style friend ' +
         'comparison the /constant command in Discord_Bot uses, via the friend-versus-level page. Use this for ' +
-        '"how many 14.3s does X have", "what are Y\'s scores on 14.7", or similar per-friend-per-constant ' +
-        'questions — get_maimai_song_ranking answers the opposite direction (who\'s best on one song), and ' +
-        "get_friend_leaderboard only has DX Rating, no per-song data at all. Only covers Master/Re:Master charts " +
-        '(constants roughly 1.0-15.0) — there is no lower-difficulty equivalent on the site. A friend with no ' +
-        "score on a chart shows friend_achievement: null (unplayed), not zero.",
+        '"what are Y\'s scores on 14.7" or similar per-friend-per-constant questions — get_maimai_song_ranking ' +
+        "answers the opposite direction (who's best on one song), and get_friend_leaderboard only has DX Rating, " +
+        'no per-song data at all. Only covers Master/Re:Master charts (constants roughly 1.0-15.0) — there is no ' +
+        "lower-difficulty equivalent on the site. A friend with no score on a chart shows friend_achievement: " +
+        'null (unplayed), not zero. IMPORTANT: this only gives percentage, never the friend\'s actual clear-type ' +
+        'badges — a high percentage does NOT prove AP (a non-AP play can land in the same range as a true AP, ' +
+        'confirmed live), so never claim/count a friend\'s AP or AP+ from this data, only report the percentage.',
     parametersJsonSchema: {
         type: 'object',
         properties: {

@@ -8,13 +8,15 @@ const declaration = {
     description:
         "Get the achievement-%% ranking for a specific song/difficulty — either this tracked account's friend " +
         'list (scope: "friend") or the global top scores (scope: "global"), each entry with a player name and ' +
-        'their achievement %%. Use this for "how many of my friends AP+\'d this song", "who has the highest ' +
-        'score on X", or similar per-song leaderboard questions — this is the actual data source for those, not ' +
-        'get_friend_leaderboard (which is DX Rating only, not per-song). Any achievement in [100.5000%, ' +
-        '101.0000%] on a chart with break notes is guaranteed to be an AP (All Perfect); exactly 101.0000%% means ' +
-        'AP+ (every break hit Critical Perfect) — count/filter entries against those thresholds yourself from the ' +
-        'returned list rather than assuming a fixed cutoff. Only works for songs this tracked account has played ' +
-        'at least once (same limitation as get_maimai_song_play_history) — it won\'t find a song it\'s never touched.',
+        'their achievement %%. Use this for "who has the highest score on X" or similar per-song leaderboard ' +
+        'questions — this is the actual data source for those, not get_friend_leaderboard (which is DX Rating ' +
+        "only, not per-song). Achievement %% alone does NOT prove a play was an AP: being in [100.5000%, " +
+        '101.0000%] on a chart with break notes is NECESSARY for AP but not SUFFICIENT — a non-Perfect regular-' +
+        "note judgment can cost less than the break bonus adds back, so a real non-AP (e.g. FC) play can land in " +
+        'that same range. This tool only exposes percentage for other players, never their actual clear-type ' +
+        "badges, so don't claim/count AP or AP+ from these entries — say plainly you can only see achievement %%, " +
+        "not confirmed AP status. Only works for songs this tracked account has played at least once (same " +
+        "limitation as get_maimai_song_play_history) — it won't find a song it's never touched.",
     parametersJsonSchema: {
         type: 'object',
         properties: {
