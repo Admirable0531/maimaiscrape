@@ -100,6 +100,16 @@ function registerMessageHandler(client, config) {
         const channelId = message.channel.id;
         const history = getHistory(channelId);
 
+        // Discord's typing indicator lasts ~10s and isn't auto-refreshed — a
+        // single sendTyping() before a multi-tool-call generateReply() (which
+        // can easily run longer than that) expires mid-work, so it looks like
+        // Atri gave up until the reply suddenly appears. Re-trigger it on an
+        // interval, comfortably under the 10s expiry, for as long as work is
+        // still in flight.
+        const typingInterval = setInterval(() => {
+            message.channel.sendTyping().catch(() => {});
+        }, 8000);
+
         try {
             await message.channel.sendTyping().catch(() => {});
             const reply = await generateReply(history, promptText, { userId, guildId });
@@ -116,6 +126,8 @@ function registerMessageHandler(client, config) {
             await message
                 .reply('Sorry, something went wrong answering that. Please try again in a moment.')
                 .catch((replyErr) => logger.error('discord', 'Could not send error reply', replyErr));
+        } finally {
+            clearInterval(typingInterval);
         }
     });
 }
