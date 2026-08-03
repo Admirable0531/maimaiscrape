@@ -19,7 +19,7 @@ function extractUserId(token) {
 }
 
 const SCOPE_DESCRIPTIONS = {
-    web: 'wiki/search/song-data tools (search_web, read_webpage, list_maimai_*_pages, search_maimai_songs)',
+    web: 'wiki/search/song-data tools (search_web, read_webpage, list_maimai_*_pages, search_maimai_songs) — granted to everyone by default, no "allow" needed',
     account: "this tracked account's own live maimai data (list_maimai_account_pages, and read_webpage for maimaidx-eng.com specifically)",
     leaderboard: "this group's tracked friend ratings and circle rankings",
     memory: 'remembering/recalling things about the asking user',

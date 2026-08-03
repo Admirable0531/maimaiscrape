@@ -83,19 +83,20 @@ function isAllowed(userId, guildId) {
 }
 
 /**
- * 'all' for the owner, a fully-allowed user, or a fully-allowed guild; an
- * array of granted scope names (the union of the user's own grant and their
- * server's grant, if any) for anyone scoped; or [] for no access at all.
- * Callers gating a specific tool should treat 'all' as "every scope
- * granted" rather than comparing arrays.
+ * 'all' for the owner, a fully-allowed user, or a fully-allowed guild;
+ * otherwise an array of granted scope names — always including 'web' (see
+ * BASELINE_SCOPES below), plus the union of the user's own grant and their
+ * server's grant, if any. Callers gating a specific tool should treat 'all'
+ * as "every scope granted" rather than comparing arrays.
  */
+const BASELINE_SCOPES = ['web'];
+
 function getAllowedScopes(userId, guildId) {
     if (isOwner(userId) || store.allowedUserIds.includes(userId)) return 'all';
     const guildScopes = getGuildScopes(guildId);
     if (guildScopes === 'all') return 'all';
     const userScopes = store.scopedUserIds[userId] || [];
-    if (userScopes.length === 0 && guildScopes.length === 0) return [];
-    return [...new Set([...userScopes, ...guildScopes])];
+    return [...new Set([...BASELINE_SCOPES, ...userScopes, ...guildScopes])];
 }
 
 /**
