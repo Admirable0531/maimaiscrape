@@ -81,12 +81,27 @@ client.once('ready', (readyClient) => {
 
 client.login(config.discordToken).catch((err) => {
     logger.error('bot', 'Failed to log in to Discord', err);
-    // Setting exitCode and letting Node drain the event loop — rather than
-    // calling process.exit() immediately — avoids a native assertion crash
-    // on Windows when discord.js still has an in-flight connection handle
-    // (e.g. an invalid-token failure caught mid-handshake).
     client.destroy();
-    process.exitCode = 1;
+    // Confirmed live: on a transient login failure (e.g. gateway.discord.gg
+    // DNS blip), discord.js's own gateway manager can keep retrying and
+    // successfully reconnect the websocket *after* this catch already ran —
+    // messageCreate events start flowing again, but the REST client's token
+    // was already wiped by destroy() above, so every reply attempt fails
+    // with "Expected token to be set for this request". Just setting
+    // exitCode and letting the event loop drain silently leaves that zombie
+    // state (the gateway reconnect keeps something alive) instead of
+    // actually exiting — force it so Docker's `restart: unless-stopped`
+    // gives the container a clean restart instead.
+    //
+    // process.exit() immediately (vs. draining) risks a native assertion
+    // crash on Windows if discord.js still has an in-flight connection
+    // handle — a real concern for local dev, not for this bot's actual
+    // deployment target (Docker/Linux), so only take the softer path there.
+    if (process.platform === 'win32') {
+        process.exitCode = 1;
+    } else {
+        process.exit(1);
+    }
 });
 
 for (const signal of ['SIGTERM', 'SIGINT']) {
