@@ -1,7 +1,7 @@
 const logger = require('../utils/logger');
 const { getHistory, appendMessage } = require('../conversation/historyStore');
 const { generateReply } = require('../ai/agent');
-const { isAllowed, isOwner } = require('../permissions/permissionStore');
+const { isOwner } = require('../permissions/permissionStore');
 const { tryHandleAdminCommand } = require('./adminCommands');
 
 const DISCORD_MESSAGE_LIMIT = 2000;
@@ -11,14 +11,13 @@ const REPLY_CONTEXT_MAX_LENGTH = 800;
 const lastReplyAtByUser = new Map();
 
 /**
- * Trigger: DMs always respond; in a guild, only when the bot is @-mentioned.
- * Replying to every message in every channel would be noisy and burn Gemini
- * quota fast, so this is a deliberate default, not a spec requirement —
- * easy to change if you want always-on channels instead.
+ * Trigger: @-mentioned in a guild channel, or a DM from the owner. DMs from
+ * anyone else are ignored — the bot doesn't respond to being messaged
+ * directly except for the owner's own admin/chat access.
  */
 function shouldRespond(message, clientUserId) {
     if (message.author.bot) return false;
-    if (!message.guild) return true;
+    if (!message.guild) return isOwner(message.author.id);
     return message.mentions.has(clientUserId);
 }
 
@@ -73,12 +72,6 @@ function registerMessageHandler(client, config) {
 
         const userId = message.author.id;
         const guildId = message.guild?.id || null;
-        if (!isAllowed(userId, guildId)) {
-            // No permission: ignore completely — no reply, no "you can't do
-            // that" message. Logged server-side only, for the owner's benefit.
-            logger.info('discord', `Ignoring ${message.author.tag} (${userId}) — no permission`);
-            return;
-        }
 
         const userText = stripMention(message.content, client.user.id);
         if (!userText) return;
