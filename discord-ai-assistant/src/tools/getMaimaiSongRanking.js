@@ -1,9 +1,7 @@
 const { fetchAccountPage } = require('../web/maimaiAccountSession');
-const { MYBEST_PATH, parseSongList, findBestMatch } = require('../web/songDetailLookup');
+const { loadSongData } = require('../web/maimaiSongData');
+const { findSongInLocalData, findPlayedSongIdx } = require('../web/maimaiSongIndex');
 const { parseRankingFormTokens, parseRankingEntries, parseYourScore } = require('../web/maimaiRankingLookup');
-const { maimaiAccountCache } = require('../web/cache');
-
-const LIST_CACHE_KEY = 'maimai-mybest-list';
 
 const declaration = {
     name: 'get_maimai_song_ranking',
@@ -50,28 +48,25 @@ async function execute(args) {
     if (!difficulty) return { success: false, error: 'difficulty is required.' };
 
     try {
-        let songs = maimaiAccountCache.get(LIST_CACHE_KEY);
-        if (!songs) {
-            const { html } = await fetchAccountPage(MYBEST_PATH);
-            songs = parseSongList(html);
-            maimaiAccountCache.set(LIST_CACHE_KEY, songs);
+        const songData = await loadSongData();
+        const song = findSongInLocalData(songData, songName);
+        if (!song) return { success: false, error: `No song matching "${songName}" found.` };
+        if (song.ambiguous) {
+            return { success: false, error: `Multiple songs match "${songName}" — be more specific.`, matches: song.ambiguous };
         }
 
-        const match = findBestMatch(songs, songName);
-        if (!match) {
-            return { success: false, error: `No song matching "${songName}" found in this account's play history.` };
-        }
-        if (match.ambiguous) {
-            return { success: false, error: `Multiple songs match "${songName}" — be more specific.`, matches: match.ambiguous };
+        const idx = await findPlayedSongIdx(song);
+        if (!idx) {
+            return { success: false, error: `"${song.title}" doesn't appear in this account's play history — it hasn't been played (on any difficulty).` };
         }
 
-        const { html: detailHtml } = await fetchAccountPage(`/maimai-mobile/record/musicDetail/?idx=${encodeURIComponent(match.idx)}`);
+        const { html: detailHtml } = await fetchAccountPage(`/maimai-mobile/record/musicDetail/?idx=${encodeURIComponent(idx)}`);
         const tokensByDifficulty = parseRankingFormTokens(detailHtml);
         const rankingIdx = tokensByDifficulty[difficulty];
         if (!rankingIdx) {
             return {
                 success: false,
-                error: `"${match.name}" has no ${difficulty} chart (or this account has never opened it).`,
+                error: `"${song.title}" has no ${difficulty} chart (or this account has never opened it).`,
                 available_difficulties: Object.keys(tokensByDifficulty),
             };
         }
@@ -88,7 +83,7 @@ async function execute(args) {
 
         return {
             success: true,
-            song_name: match.name,
+            song_name: song.title,
             difficulty,
             scope,
             your_score: parseYourScore(rankingHtml),

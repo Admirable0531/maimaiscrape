@@ -1,18 +1,16 @@
 const { fetchAccountPage } = require('../web/maimaiAccountSession');
 const { loadDocument, extractMeta } = require('../web/htmlExtractor');
-const { MYBEST_PATH, parseSongList, findBestMatch } = require('../web/songDetailLookup');
-const { maimaiAccountCache } = require('../web/cache');
-
-const LIST_CACHE_KEY = 'maimai-mybest-list';
+const { loadSongData } = require('../web/maimaiSongData');
+const { findSongInLocalData, findPlayedSongIdx } = require('../web/maimaiSongIndex');
 
 const declaration = {
     name: 'get_maimai_song_play_history',
     description:
-        "Look up this tracked account's play count and per-difficulty last-played date for a specific song, by " +
+        "Look up this tracked account's per-difficulty play count and last-played date for a specific song, by " +
         'name — e.g. "how many times has this account played Titania" or "when did this account last play ' +
         'sølips on 14+". This is real per-song history the account\'s recent-play log and record pages don\'t ' +
-        "show directly. Matches by (case-insensitive, partial) song name against this account's My Best list, so " +
-        "it only finds songs the account has played at least once — it won't find a song it's never touched.",
+        "show directly. It only finds a chart the account has actually played at least once — it won't find one " +
+        "it's never touched.",
     parametersJsonSchema: {
         type: 'object',
         properties: {
@@ -27,35 +25,27 @@ async function execute(args) {
     if (!songName) return { success: false, error: 'song_name is required.' };
 
     try {
-        let songs = maimaiAccountCache.get(LIST_CACHE_KEY);
-        if (!songs) {
-            const { html } = await fetchAccountPage(MYBEST_PATH);
-            songs = parseSongList(html);
-            maimaiAccountCache.set(LIST_CACHE_KEY, songs);
+        const songData = await loadSongData();
+        const song = findSongInLocalData(songData, songName);
+        if (!song) return { success: false, error: `No song matching "${songName}" found.` };
+        if (song.ambiguous) {
+            return { success: false, error: `Multiple songs match "${songName}" — be more specific.`, matches: song.ambiguous };
         }
 
-        const match = findBestMatch(songs, songName);
-        if (!match) {
-            return { success: false, error: `No song matching "${songName}" found in this account's play history.` };
-        }
-        if (match.ambiguous) {
-            return {
-                success: false,
-                error: `Multiple songs match "${songName}" — be more specific.`,
-                matches: match.ambiguous,
-            };
+        const idx = await findPlayedSongIdx(song);
+        if (!idx) {
+            return { success: false, error: `"${song.title}" doesn't appear in this account's play history — it hasn't been played (on any difficulty).` };
         }
 
         const { html: detailHtml, finalUrl } = await fetchAccountPage(
-            `/maimai-mobile/record/musicDetail/?idx=${encodeURIComponent(match.idx)}`
+            `/maimai-mobile/record/musicDetail/?idx=${encodeURIComponent(idx)}`
         );
         const { $ } = loadDocument(detailHtml, finalUrl);
         const meta = extractMeta($, finalUrl);
 
         return {
             success: true,
-            song_name: match.name,
-            total_play_count: match.playCount,
+            song_name: song.title,
             // Per-difficulty breakdown (level, last played date, play count,
             // achievement %) is embedded in this text, not worth a bespoke
             // parser for — it reads fine as-is, same as any other page's text.
