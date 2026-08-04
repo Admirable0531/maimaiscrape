@@ -25,7 +25,7 @@ function loadEnv() {
         geminiApiKey: process.env.GEMINI_API_KEY,
         ownerUserId: process.env.OWNER_USER_ID,
         geminiModel: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
-        maxHistoryMessages: Number(process.env.MAX_HISTORY_MESSAGES) || 3,
+        maxHistoryMessages: Number(process.env.MAX_HISTORY_MESSAGES) || 4,
         replyCooldownMs: Number(process.env.REPLY_COOLDOWN_MS) || 3000,
         conversationRetentionDays: Number(process.env.CONVERSATION_RETENTION_DAYS) || 30,
     };
