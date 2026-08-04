@@ -1,5 +1,6 @@
 const { GEMINI_TOOLS, createToolExecutors } = require('../toolDefinitions');
 const { buildSystemPrompt } = require('../systemPrompt');
+const { isOwner } = require('../../permissions/permissionStore');
 const logger = require('../../utils/logger');
 
 const API_URL = 'https://api.deepseek.com/chat/completions';
@@ -9,7 +10,23 @@ const TIMEOUT_MS = 30000;
 // on agentic/tool-use tasks (unlike Llama-class models) — see agent.js for
 // how this is wired as primary with Gemini as the fallback.
 const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
-const MAX_OUTPUT_TOKENS = Number(process.env.DEEPSEEK_MAX_OUTPUT_TOKENS) || 2048;
+// Confirmed live (see conversation log 2026-08-04): reasoning_tokens alone
+// routinely ate 500-1500+ tokens per round at the old 2048 cap, leaving
+// uncomfortably little room for the actual tool call / answer — DeepSeek
+// returns an EMPTY response (finish_reason: "length", no text, no
+// tool_calls) when reasoning eats the whole budget, which throws and burns
+// the whole turn on a cold-restart fallback to Gemini. 4096 confirmed via
+// live testing to survive multiple rounds without hitting that failure.
+const MAX_OUTPUT_TOKENS = Number(process.env.DEEPSEEK_MAX_OUTPUT_TOKENS) || 4096;
+// Only the owner can ask for this (see wantsHigherBudget below) — a wider
+// budget raises real cost (reasoning tokens are billed) so it isn't the
+// default for every user on every message.
+const BOOSTED_MAX_OUTPUT_TOKENS = Number(process.env.DEEPSEEK_MAX_OUTPUT_TOKENS_BOOSTED) || 8192;
+// Deliberately loose phrasing match, not a fixed command — this is meant to
+// fire on natural asks ("can you think harder about this") without the
+// owner needing to remember exact syntax. False positives just cost a
+// larger (still bounded) token budget, not a wrong answer, so loose is fine.
+const HIGHER_BUDGET_PATTERN = /\b(think|try|dig|look|search|research)\s+(harder|deeper|more)\b/i;
 // Mirrors geminiProvider.js's elastic tool-call budget — see its comments
 // for the reasoning.
 const BASE_MAX_TOOL_ITERATIONS = Number(process.env.DEEPSEEK_MAX_TOOL_ITERATIONS) || 6;
@@ -49,6 +66,11 @@ function estimateInitialEffort(userMessage) {
 function estimateFollowUpEffort(toolCalls) {
     const usedHeavyTool = toolCalls.some((call) => HEAVY_REASONING_TOOLS.has(call.function.name));
     return usedHeavyTool ? 'max' : 'high';
+}
+
+/** Owner-only: whether this message is explicitly asking for a wider token budget (see HIGHER_BUDGET_PATTERN above). */
+function wantsHigherBudget(userId, userMessage) {
+    return isOwner(userId) && HIGHER_BUDGET_PATTERN.test(userMessage || '');
 }
 
 /**
@@ -93,7 +115,7 @@ function toDeepseekMessages(history, userMessage, context) {
     ];
 }
 
-async function callDeepseek(messages, { toolChoice, reasoningEffort } = {}) {
+async function callDeepseek(messages, { toolChoice, reasoningEffort, maxTokens } = {}) {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) {
         throw new Error('DEEPSEEK_API_KEY is not set; cannot call DeepSeek.');
@@ -109,7 +131,7 @@ async function callDeepseek(messages, { toolChoice, reasoningEffort } = {}) {
                 messages,
                 tools: OPENAI_TOOLS,
                 tool_choice: toolChoice || 'auto',
-                max_tokens: MAX_OUTPUT_TOKENS,
+                max_tokens: maxTokens || MAX_OUTPUT_TOKENS,
                 // low | high | max — see the effort-estimation comment above.
                 // Omitted entirely falls back to DeepSeek's own default ("high").
                 ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
@@ -140,9 +162,13 @@ async function generateReply(history, userMessage, { userId, guildId }) {
     // to go on yet), then from iteration 2 onward reflects whichever tools
     // the model actually reached for on the previous turn.
     let reasoningEffort = estimateInitialEffort(userMessage);
+    const maxTokens = wantsHigherBudget(userId, userMessage) ? BOOSTED_MAX_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS;
+    if (maxTokens !== MAX_OUTPUT_TOKENS) {
+        logger.info('agent', `Owner asked for a deeper look — using boosted token budget (${maxTokens})`);
+    }
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
-        const data = await callDeepseek(messages, { reasoningEffort });
+        const data = await callDeepseek(messages, { reasoningEffort, maxTokens });
         const message = data.choices?.[0]?.message;
         const toolCalls = message?.tool_calls;
 
@@ -223,7 +249,7 @@ async function generateReply(history, userMessage, { userId, guildId }) {
         'agent',
         `Hit ${maxIterations} tool-call iterations without a final answer — forcing a text-only reply`
     );
-    const finalData = await callDeepseek(messages, { toolChoice: 'none', reasoningEffort });
+    const finalData = await callDeepseek(messages, { toolChoice: 'none', reasoningEffort, maxTokens });
     const finalText = (finalData.choices?.[0]?.message?.content || '').trim();
     if (finalText) return finalText;
 
