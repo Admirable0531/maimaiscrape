@@ -151,6 +151,39 @@ async function waitForTopRecordPageReady(page) {
 async function getTopScore(page) {
     await waitForTopRecordPageReady(page);
     const data = await page.evaluate(() => {
+        // Confirmed live (2026-08): the top-record row no longer has a rank-
+        // letter cell at all, and gained a "versionCell" (e.g. "CiRCLE", the
+        // game version) between Song and the chart-type cell — a change from
+        // whatever layout this was originally written against. Read cells by
+        // their own class names rather than fixed positions so a future
+        // column reshuffle fails loudly (missing cell -> row skipped) instead
+        // of silently mislabeling data the way the old cells[2..6] indexing
+        // did (Level/Achv/Rank ended up one column off with no error).
+        function cellText(row, className) {
+            const el = row.querySelector('td.' + className);
+            return el ? el.textContent.trim() : null;
+        }
+
+        // Same achievement-%% brackets as discord-ai-assistant's
+        // maimaiRatingMath.js (RANK_DEFINITIONS) — duplicated here rather
+        // than shared since this runs inside page.evaluate() (browser
+        // context, no module access) and this project doesn't otherwise
+        // depend on that one. The site no longer shows the rank letter
+        // itself, so this is the only way to still populate it for
+        // update_score.js's embeds and the web dashboard's rank badge.
+        const RANK_BRACKETS = [
+            [100.5, 'SSS+'], [100.0, 'SSS'], [99.5, 'SS+'], [99.0, 'SS'],
+            [98.0, 'S+'], [97.0, 'S'], [94.0, 'AAA'], [90.0, 'AA'],
+            [80.0, 'A'], [75.0, 'BBB'], [70.0, 'BB'], [60.0, 'B'],
+            [50.0, 'C'], [0.0, 'D'],
+        ];
+        function rankFromAchv(achvText) {
+            const achv = parseFloat(String(achvText).replace('%', ''));
+            if (Number.isNaN(achv)) return null;
+            const bracket = RANK_BRACKETS.find(([min]) => achv >= min);
+            return bracket ? bracket[1] : null;
+        }
+
         function parseTable(table) {
             const rows = Array.from(table.querySelectorAll('tr.scoreRecordRow'));
             const out = [];
@@ -158,16 +191,23 @@ async function getTopScore(page) {
                 const row = rows[i];
                 const classes = Array.from(row.classList || []);
                 const diff = classes.length > 1 ? classes[1] : '';
-                const cells = Array.from(row.querySelectorAll('td'));
-                if (cells.length < 7) continue;
+                const order = cellText(row, 'orderCell');
+                const song = cellText(row, 'songTitleCell');
+                const version = cellText(row, 'versionCell');
+                const chart = cellText(row, 'chartTypeCell');
+                const level = cellText(row, 'levelCell');
+                const achv = cellText(row, 'achievementCell');
+                const rating = cellText(row, 'ratingCell');
+                if (order === null || song === null || level === null || achv === null || rating === null) continue;
                 out.push({
-                    '#': cells[0].textContent.trim(),
-                    Song: cells[1].textContent.trim(),
-                    Chart: cells[2].textContent.trim(),
-                    Level: cells[3].textContent.trim(),
-                    Achv: cells[4].textContent.trim(),
-                    Rank: cells[5].textContent.trim(),
-                    Rating: cells[6].textContent.trim(),
+                    '#': order,
+                    Song: song,
+                    Version: version,
+                    Chart: chart,
+                    Level: level,
+                    Achv: achv,
+                    Rank: rankFromAchv(achv),
+                    Rating: rating,
                     Diff: diff,
                 });
             }
