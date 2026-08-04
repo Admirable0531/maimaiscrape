@@ -1,5 +1,5 @@
 const { GEMINI_TOOLS, createToolExecutors } = require('../toolDefinitions');
-const { SYSTEM_PROMPT } = require('../systemPrompt');
+const { buildSystemPrompt } = require('../systemPrompt');
 const logger = require('../../utils/logger');
 
 const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -50,9 +50,9 @@ const OPENAI_TOOLS = [
     },
 ];
 
-function toGroqMessages(history, userMessage) {
+function toGroqMessages(history, userMessage, context) {
     return [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(context) },
         ...history.map((entry) => ({
             role: entry.role === 'assistant' ? 'assistant' : 'user',
             content: entry.content,
@@ -100,7 +100,7 @@ async function callGroq(messages, { toolChoice } = {}) {
  */
 async function generateReply(history, userMessage, { userId, guildId }) {
     const executors = createToolExecutors({ userId, guildId });
-    const messages = toGroqMessages(history, userMessage);
+    const messages = toGroqMessages(history, userMessage, { userId, guildId });
     let maxIterations = BASE_MAX_TOOL_ITERATIONS;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {

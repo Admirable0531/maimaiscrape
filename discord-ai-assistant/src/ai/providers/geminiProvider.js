@@ -1,6 +1,6 @@
 const { FunctionCallingConfigMode } = require('@google/genai');
 const { getGeminiClient } = require('./geminiClient');
-const { SYSTEM_PROMPT } = require('../systemPrompt');
+const { buildSystemPrompt } = require('../systemPrompt');
 const { GEMINI_TOOLS, createToolExecutors } = require('../toolDefinitions');
 const logger = require('../../utils/logger');
 
@@ -99,6 +99,7 @@ async function generateReply(history, userMessage, { userId, guildId }) {
     const ai = getGeminiClient();
     const executors = createToolExecutors({ userId, guildId });
     const contents = toGeminiContents(history, userMessage);
+    const systemInstruction = buildSystemPrompt({ userId, guildId });
     let maxIterations = BASE_MAX_TOOL_ITERATIONS;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
@@ -106,7 +107,7 @@ async function generateReply(history, userMessage, { userId, guildId }) {
             model: MODEL,
             contents,
             config: {
-                systemInstruction: SYSTEM_PROMPT,
+                systemInstruction,
                 tools: TOOLS_FOR_REQUEST,
                 maxOutputTokens: MAX_OUTPUT_TOKENS,
                 thinkingConfig: { thinkingBudget: THINKING_BUDGET },
@@ -216,7 +217,7 @@ async function generateReply(history, userMessage, { userId, guildId }) {
         model: MODEL,
         contents,
         config: {
-            systemInstruction: SYSTEM_PROMPT,
+            systemInstruction,
             tools: TOOLS_FOR_REQUEST,
             toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.NONE } },
             maxOutputTokens: MAX_OUTPUT_TOKENS,

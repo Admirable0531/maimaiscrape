@@ -1,5 +1,5 @@
 const { GEMINI_TOOLS, createToolExecutors } = require('../toolDefinitions');
-const { SYSTEM_PROMPT } = require('../systemPrompt');
+const { buildSystemPrompt } = require('../systemPrompt');
 const logger = require('../../utils/logger');
 
 const API_URL = 'https://api.deepseek.com/chat/completions';
@@ -82,9 +82,9 @@ const OPENAI_TOOLS = [
     },
 ];
 
-function toDeepseekMessages(history, userMessage) {
+function toDeepseekMessages(history, userMessage, context) {
     return [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(context) },
         ...history.map((entry) => ({
             role: entry.role === 'assistant' ? 'assistant' : 'user',
             content: entry.content,
@@ -134,7 +134,7 @@ async function callDeepseek(messages, { toolChoice, reasoningEffort } = {}) {
  */
 async function generateReply(history, userMessage, { userId, guildId }) {
     const executors = createToolExecutors({ userId, guildId });
-    const messages = toDeepseekMessages(history, userMessage);
+    const messages = toDeepseekMessages(history, userMessage, { userId, guildId });
     let maxIterations = BASE_MAX_TOOL_ITERATIONS;
     // Recomputed each iteration — starts from the raw message (nothing else
     // to go on yet), then from iteration 2 onward reflects whichever tools
