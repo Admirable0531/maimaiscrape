@@ -1,7 +1,7 @@
 # Manual-run Puppeteer scraper image (see the `scraper` service in docker-compose.yml).
 FROM node:18-bullseye
 
-# Chromium and its runtime libraries (same set as Discord_Bot/Dockerfile)
+# Chromium and its runtime libraries (same set as discord-bot/Dockerfile)
 RUN apt-get update && apt-get install -y \
   chromium \
   fonts-liberation \
@@ -32,7 +32,7 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 # Mirror the repository layout so relative requires resolve as they do locally.
-COPY Discord_Bot/ ./Discord_Bot/
+COPY discord-bot/ ./discord-bot/
 COPY server/ ./server/
 
 CMD ["node", "server/run-user-data-cron.js"]

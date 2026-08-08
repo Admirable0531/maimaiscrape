@@ -56,7 +56,7 @@ Set `DAILY_PIPELINE_ENABLED=false` to disable the schedule and drive everything 
 After adding or changing a command, re-register it:
 
 ```bash
-docker compose exec bot node Discord_Bot/deploy-commands.js
+docker compose exec bot node discord-bot/deploy-commands.js
 ```
 
 ## 🛠️ Setup
@@ -71,7 +71,7 @@ docker compose up -d
 
 ### Configuration
 
-All credentials live in `.env`, which is gitignored. `Discord_Bot/config.js` holds
+All credentials live in `.env`, which is gitignored. `discord-bot/config.js` holds
 only non-secret values and reads every secret from the environment — there are no
 hardcoded fallbacks, so **the bot will warn on startup and scrapes will fail** if a
 variable is missing. See `.env.example` for the full list.
@@ -89,8 +89,8 @@ reports as skipped every night instead of failing.
 |------------|------------|----------|
 | `ryan_top`, `friend_<idx>_top` | `server/update_user_data.js` | Daily top-play snapshots (`new`, `old`, `rating`, `Date`) |
 | `user_info` | `server/update_user_data.js` | Profile name / avatar / rating per day |
-| `friend_rating_daily_snapshots` | `Discord_Bot/scripts/friends_webhook.js` | One document per day of friend ratings |
-| `circle_rankings` | `Discord_Bot/scripts/circle_ranking_scraper.js` | Top-100 circle snapshots (7-day retention) |
+| `friend_rating_daily_snapshots` | `discord-bot/scripts/friends_webhook.js` | One document per day of friend ratings |
+| `circle_rankings` | `discord-bot/scripts/circle_ranking_scraper.js` | Top-100 circle snapshots (7-day retention) |
 
 Friends are keyed by the `friendIdx` from their maimai link, not by nickname.
 `server/collectionNames.js` is the single source of truth for collection naming.
@@ -98,7 +98,7 @@ Friends are keyed by the `friendIdx` from their maimai link, not by nickname.
 ## 🧱 Layout
 
 ```
-Discord_Bot/
+discord-bot/
   index.js            bot entry point; registers all cron schedules on ready
   config.js           non-secret config; secrets come from the environment
   lib/                shared helpers: mongo, webhook, format, maimai_session

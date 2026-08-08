@@ -7,17 +7,17 @@
     "node": ">=18"
   },
   "scripts": {
-    "bot": "node Discord_Bot/index.js",
+    "bot": "node discord-bot/index.js",
     "api": "node server/express_server.js",
-    "deploy-commands": "node Discord_Bot/deploy-commands.js",
+    "deploy-commands": "node discord-bot/deploy-commands.js",
     "scraper": "node server/update_user_data.js",
     "run-scraper": "node server/update_user_data.js",
-    "friends": "node Discord_Bot/scripts/friends_webhook.js",
-    "circle": "node Discord_Bot/scripts/circle_ranking_scraper.js",
-    "daily-points": "node Discord_Bot/scripts/daily_points_tracker.js",
+    "friends": "node discord-bot/scripts/friends_webhook.js",
+    "circle": "node discord-bot/scripts/circle_ranking_scraper.js",
+    "daily-points": "node discord-bot/scripts/daily_points_tracker.js",
     "migrate": "node server/scripts/migrate-collections-to-friend-idx.js",
-    "lint": "eslint Discord_Bot/ server/ scripts/",
-    "format": "prettier --write \"Discord_Bot/**/*.js\" \"server/**/*.js\" \"scripts/**/*.js\""
+    "lint": "eslint discord-bot/ server/ scripts/",
+    "format": "prettier --write \"discord-bot/**/*.js\" \"server/**/*.js\" \"scripts/**/*.js\""
   },
   "dependencies": {
     "discord.js": "^14.14.1",

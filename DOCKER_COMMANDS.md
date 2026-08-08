@@ -3,7 +3,7 @@
 Run these from the project directory on the Pi (`~/Desktop/maimaiscrape`).
 
 Images mirror the repository layout under `/app`, so paths are the same as in the
-repo: `Discord_Bot/...` and `server/...`.
+repo: `discord-bot/...` and `server/...`.
 
 ---
 
@@ -18,7 +18,7 @@ docker compose logs -f bot
 docker compose logs -f api
 
 # Re-register slash commands (needed after adding or editing one)
-docker compose exec bot node Discord_Bot/deploy-commands.js
+docker compose exec bot node discord-bot/deploy-commands.js
 ```
 
 ## Run the daily pipeline now
@@ -53,9 +53,9 @@ docker compose run --rm scraper node server/update_user_data.js
 Individual scripts can also be run in the bot container:
 
 ```bash
-docker compose exec bot node Discord_Bot/scripts/friends_webhook.js
-docker compose exec bot node Discord_Bot/scripts/circle_ranking_scraper.js
-docker compose exec bot node Discord_Bot/scripts/daily_points_tracker.js
+docker compose exec bot node discord-bot/scripts/friends_webhook.js
+docker compose exec bot node discord-bot/scripts/circle_ranking_scraper.js
+docker compose exec bot node discord-bot/scripts/daily_points_tracker.js
 ```
 
 ## Screenshots / watching the browser
@@ -118,7 +118,7 @@ docker compose exec mongodb mongo mydatabase
 |------|---------|
 | Rebuild + restart | `docker compose up -d --build` |
 | Bot logs | `docker compose logs -f bot` |
-| Re-register commands | `docker compose exec bot node Discord_Bot/deploy-commands.js` |
+| Re-register commands | `docker compose exec bot node discord-bot/deploy-commands.js` |
 | Manual scraper run | `docker compose run --rm scraper node server/update_user_data.js` |
 | Migration | `docker compose exec api node server/scripts/migrate-collections-to-friend-idx.js` |
 | Mongo shell | `docker compose exec mongodb mongo mydatabase` |

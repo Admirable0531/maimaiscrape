@@ -42,7 +42,7 @@ docker compose ps
 ## 5. Register Discord slash commands
 
 ```bash
-docker compose exec bot node Discord_Bot/deploy-commands.js
+docker compose exec bot node discord-bot/deploy-commands.js
 ```
 
 Re-run this only when the set of slash commands changes.

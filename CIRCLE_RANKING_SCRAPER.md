@@ -4,14 +4,14 @@ Collects the top 100 circle rankings from the maimai DX NET circle ranking page.
 
 ## Files
 
-- `Discord_Bot/scripts/circle_ranking_scraper.js` — the scraper
-- `Discord_Bot/scripts/daily_points_tracker.js` — points-gain report over stored snapshots
-- `Discord_Bot/commands/scraper/circle.js` — `/circle` manual trigger
-- `Discord_Bot/commands/scraper/dailypoints.js` — `/dailypoints` manual report
-- `Discord_Bot/commands/latestcirclerankings/latestcirclerankings.js` — `/latestcirclerankings`
+- `discord-bot/scripts/circle_ranking_scraper.js` — the scraper
+- `discord-bot/scripts/daily_points_tracker.js` — points-gain report over stored snapshots
+- `discord-bot/commands/scraper/circle.js` — `/circle` manual trigger
+- `discord-bot/commands/scraper/dailypoints.js` — `/dailypoints` manual report
+- `discord-bot/commands/latestcirclerankings/latestcirclerankings.js` — `/latestcirclerankings`
 
 Login, browser setup and error-page handling are shared with the friend-list
-scraper via `Discord_Bot/lib/maimai_session.js`.
+scraper via `discord-bot/lib/maimai_session.js`.
 
 ## Scheduling
 
@@ -24,13 +24,13 @@ always compares the two newest snapshots.
 > Earlier revisions of this document described a 30-minute cadence with special
 > runs at 02:55 and 06:05. That was never implemented; the schedule has always
 > been a single daily run. If you do want a higher cadence, add a second
-> `scheduleJob(...)` call in `Discord_Bot/index.js` — `daily_points_tracker.js`
+> `scheduleJob(...)` call in `discord-bot/index.js` — `daily_points_tracker.js`
 > already handles multiple same-day snapshots (it then measures first→last within
 > the day instead of day-over-day).
 
 ## Configuration
 
-From `Discord_Bot/config.js`, all sourced from `.env`:
+From `discord-bot/config.js`, all sourced from `.env`:
 
 - `MAIMAI_ACCOUNT_RATING_FY` — Sega ID used to log in
 - `MAIMAI_PASSWORD_RATING` — password
@@ -94,10 +94,10 @@ date. `webhook` defaults to `false` for manual runs.
 
 ```bash
 # one-off run, no Discord post
-docker compose exec bot node Discord_Bot/scripts/circle_ranking_scraper.js
+docker compose exec bot node discord-bot/scripts/circle_ranking_scraper.js
 
 # with screenshots (written to ./screenshots via the api service's volume)
-docker compose exec -e SCREENSHOT_DEBUG=1 api node Discord_Bot/scripts/circle_ranking_scraper.js
+docker compose exec -e SCREENSHOT_DEBUG=1 api node discord-bot/scripts/circle_ranking_scraper.js
 ```
 
 - `HEADLESS=false` — show the browser window

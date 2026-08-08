@@ -6,12 +6,12 @@ services:
   bot:
     build:
       context: .
-      dockerfile: Discord_Bot/Dockerfile
+      dockerfile: discord-bot/Dockerfile
     container_name: discord_bot
     env_file:
       - .env
     working_dir: /app
-    command: ["node", "Discord_Bot/index.js"]
+    command: ["node", "discord-bot/index.js"]
     depends_on:
       mongodb:
         condition: service_healthy
@@ -56,7 +56,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Discord_Bot/Dockerfile
+      dockerfile: discord-bot/Dockerfile
     container_name: express_api
     env_file:
       - .env

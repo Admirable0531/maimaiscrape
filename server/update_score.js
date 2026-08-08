@@ -1,6 +1,6 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
-const config = require('../Discord_Bot/config');
-const { getDb } = require('../Discord_Bot/lib/mongo');
+const config = require('../discord-bot/config');
+const { getDb } = require('../discord-bot/lib/mongo');
 const { getTopCollectionName, getFriendIdxFromOldName } = require('./collectionNames');
 const { fetchBinary } = require('./lib/fetchBinary');
 

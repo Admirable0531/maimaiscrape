@@ -8,11 +8,11 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const { updateUserData } = require('./update_user_data');
 const updateScore = require('./update_score');
 const { getTopCollectionName } = require('./collectionNames');
-const { getDb, closeMongo } = require('../Discord_Bot/lib/mongo');
+const { getDb, closeMongo } = require('../discord-bot/lib/mongo');
 
-const friendsWebhook = require('../Discord_Bot/scripts/friends_webhook');
-const { sortRankings } = require('../Discord_Bot/scripts/circle_ranking_scraper');
-const { parseRatingToNumber } = require('../Discord_Bot/lib/format');
+const friendsWebhook = require('../discord-bot/scripts/friends_webhook');
+const { sortRankings } = require('../discord-bot/scripts/circle_ranking_scraper');
+const { parseRatingToNumber } = require('../discord-bot/lib/format');
 
 const app = express();
 app.use(express.json());
@@ -88,7 +88,7 @@ async function toDataUrl(url) {
     return `data:${mime};base64,${buffer.toString('base64')}`;
 }
 
-// Single shared MongoClient for the process (see Discord_Bot/lib/mongo.js)
+// Single shared MongoClient for the process (see discord-bot/lib/mongo.js)
 const getDatabase = getDb;
 
 // API endpoints for users and scores (username = 'ryan' or friendIdx as string: '0','1',...)

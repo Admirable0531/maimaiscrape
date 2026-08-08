@@ -7,7 +7,7 @@ const { chunkLines } = require('../../lib/format');
 puppeteer.use(StealthPlugin());
 
 // Credentials come from the same .env the rest of the bot uses. The previous
-// dotenv path here resolved to Discord_Bot/commands/.env, which does not exist,
+// dotenv path here resolved to discord-bot/commands/.env, which does not exist,
 // so local (non-Docker) runs had no login at all.
 const MAIMAI_USER = process.env.MAIMAI_USER;
 const MAIMAI_PASS = process.env.MAIMAI_PASS;

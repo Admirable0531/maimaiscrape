@@ -13,6 +13,7 @@ export default [
                 module: 'writable',
                 require: 'readonly',
                 fetch: 'readonly',
+                AbortSignal: 'readonly',
                 setTimeout: 'readonly',
                 setInterval: 'readonly',
                 clearTimeout: 'readonly',

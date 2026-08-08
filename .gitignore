@@ -3,7 +3,7 @@ node_modules/
 *.log
 nohup.out
 
-# Debug screenshots from maimai_session.js's SCREENSHOT_DEBUG (see Discord_Bot/lib/maimai_session.js)
+# Debug screenshots from maimai_session.js's SCREENSHOT_DEBUG (see discord-bot/lib/maimai_session.js)
 screenshots/
 
 # Claude Code project state — settings.json is committed (shared permission

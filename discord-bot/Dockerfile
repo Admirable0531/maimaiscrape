@@ -33,10 +33,10 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 # Keep the repository layout inside the image, so relative requires such as
-# server/ -> ../Discord_Bot/config resolve identically in Docker and locally.
-# (Previously Discord_Bot/* was flattened into /app, which broke
-# server/express_server.js's require of ../Discord_Bot/scripts/friends_webhook.)
-COPY Discord_Bot/ ./Discord_Bot/
+# server/ -> ../discord-bot/config resolve identically in Docker and locally.
+# (Previously discord-bot/* was flattened into /app, which broke
+# server/express_server.js's require of ../discord-bot/scripts/friends_webhook.)
+COPY discord-bot/ ./discord-bot/
 COPY server/ ./server/
 
-CMD ["node", "Discord_Bot/index.js"]
+CMD ["node", "discord-bot/index.js"]
