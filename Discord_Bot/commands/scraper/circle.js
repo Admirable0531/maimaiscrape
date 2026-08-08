@@ -5,19 +5,25 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('circle')
         .setDescription('Manually trigger circle ranking scraper')
-        .addStringOption(option =>
-            option.setName('webhook')
-                .setDescription('Webhook behavior: auto (only if changes), force (always send), none (never send)')
+        .addStringOption((option) =>
+            option
+                .setName('webhook')
+                .setDescription(
+                    'Webhook behavior: auto (only if changes), force (always send), none (never send)'
+                )
                 .setRequired(false)
                 .addChoices(
                     { name: 'Auto (only if changes)', value: 'auto' },
                     { name: 'Force (always send)', value: 'force' },
                     { name: 'None (never send)', value: 'none' }
-                ))
-        .addBooleanOption(option =>
-            option.setName('save')
+                )
+        )
+        .addBooleanOption((option) =>
+            option
+                .setName('save')
                 .setDescription('Save to MongoDB (default: true)')
-                .setRequired(false)),
+                .setRequired(false)
+        ),
     async execute(interaction) {
         await interaction.deferReply();
 
@@ -36,12 +42,13 @@ module.exports = {
         try {
             const result = await circleRankingScraper.run({
                 sendWebhook,
-                saveToMongo
+                saveToMongo,
             });
 
             if (result.maintenance) {
                 await interaction.editReply({
-                    content: '⚠️ maimai is currently in maintenance (3:00 AM - 6:00 AM MYT). Circle ranking scraper skipped.',
+                    content:
+                        '⚠️ maimai is currently in maintenance (3:00 AM - 6:00 AM MYT). Circle ranking scraper skipped.',
                 });
                 return;
             }
@@ -53,15 +60,18 @@ module.exports = {
                 } else if (webhookOption === 'force') {
                     webhookStatus = 'Sent (forced)';
                 } else if (webhookOption === 'auto') {
-                    webhookStatus = result.sentWebhook ? 'Sent (changes detected)' : 'Skipped (no changes)';
+                    webhookStatus = result.sentWebhook
+                        ? 'Sent (changes detected)'
+                        : 'Skipped (no changes)';
                 }
 
                 await interaction.editReply({
-                    content: `✅ Circle ranking scraper completed successfully!\n` +
-                            `📊 Found ${result.rankingsCount} circle rankings\n` +
-                            `🔄 Changes detected: ${result.hasChanges ? 'Yes' : 'No'}\n` +
-                            `💾 Saved to MongoDB: ${saveToMongo ? 'Yes' : 'No'}\n` +
-                            `📤 Webhook: ${webhookStatus}`,
+                    content:
+                        `✅ Circle ranking scraper completed successfully!\n` +
+                        `📊 Found ${result.rankingsCount} circle rankings\n` +
+                        `🔄 Changes detected: ${result.hasChanges ? 'Yes' : 'No'}\n` +
+                        `💾 Saved to MongoDB: ${saveToMongo ? 'Yes' : 'No'}\n` +
+                        `📤 Webhook: ${webhookStatus}`,
                 });
             } else {
                 await interaction.editReply({

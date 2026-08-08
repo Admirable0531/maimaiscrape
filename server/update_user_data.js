@@ -6,7 +6,8 @@ require('dotenv').config();
 const { getTopCollectionName } = require('./collectionNames');
 
 const HEADLESS = process.env.HEADLESS !== 'false' && process.env.HEADLESS !== '0';
-const SCREENSHOT_DEBUG = process.env.SCREENSHOT_DEBUG === '1' || process.env.SCREENSHOT_DEBUG === 'true';
+const SCREENSHOT_DEBUG =
+    process.env.SCREENSHOT_DEBUG === '1' || process.env.SCREENSHOT_DEBUG === 'true';
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR || path.join(process.cwd(), 'screenshots');
 
 function delay(ms) {
@@ -35,7 +36,6 @@ function waitForNewPage(browser, timeoutMs = 60000) {
         browser.on('targetcreated', handler);
     });
 }
-
 
 async function debugScreenshot(page, stepName) {
     if (!SCREENSHOT_DEBUG || !page) return;
@@ -95,7 +95,9 @@ async function clickVisibleAgreeCheckbox(page) {
                 } catch (e) {
                     try {
                         await page.evaluate((el) => el.click(), label);
-                        console.log('[agree] clicked label inside #agree-maimaidxex via JS click()');
+                        console.log(
+                            '[agree] clicked label inside #agree-maimaidxex via JS click()'
+                        );
                         return true;
                     } catch (err) {}
                 }
@@ -126,18 +128,24 @@ const TOP_RECORD_POLL_MS = parseInt(process.env.TOP_RECORD_POLL_MS || '2000', 10
 /** Wait for SEGA top-record page: poll every few seconds; exit as soon as table appears (no full timeout once loaded). */
 async function waitForTopRecordPageReady(page) {
     const tableSelector = '.topRecordTable.songRecordTable';
-    const loadingPattern = 'Loading\\s+(?:Re:?Master|Basic|Master|Expert|Advanced|recent)\\s+scores';
+    const loadingPattern =
+        'Loading\\s+(?:Re:?Master|Basic|Master|Expert|Advanced|recent)\\s+scores';
     const deadline = Date.now() + TOP_RECORD_TABLE_TIMEOUT;
     let lastLoading = '';
     while (Date.now() < deadline) {
-        const { table, loading } = await page.evaluate((sel, pattern) => {
-            const table = !!document.querySelector(sel);
-            const body = (document.body && document.body.innerText) ? document.body.innerText : '';
-            const re = new RegExp(pattern, 'i');
-            const m = body.match(re);
-            const loading = m ? m[0] : (body.includes('Loading') ? 'Loading…' : '');
-            return { table, loading };
-        }, tableSelector, loadingPattern);
+        const { table, loading } = await page.evaluate(
+            (sel, pattern) => {
+                const table = !!document.querySelector(sel);
+                const body =
+                    document.body && document.body.innerText ? document.body.innerText : '';
+                const re = new RegExp(pattern, 'i');
+                const m = body.match(re);
+                const loading = m ? m[0] : body.includes('Loading') ? 'Loading…' : '';
+                return { table, loading };
+            },
+            tableSelector,
+            loadingPattern
+        );
         if (table) return;
         if (loading && loading !== lastLoading) {
             lastLoading = loading;
@@ -172,10 +180,20 @@ async function getTopScore(page) {
         // itself, so this is the only way to still populate it for
         // update_score.js's embeds and the web dashboard's rank badge.
         const RANK_BRACKETS = [
-            [100.5, 'SSS+'], [100.0, 'SSS'], [99.5, 'SS+'], [99.0, 'SS'],
-            [98.0, 'S+'], [97.0, 'S'], [94.0, 'AAA'], [90.0, 'AA'],
-            [80.0, 'A'], [75.0, 'BBB'], [70.0, 'BB'], [60.0, 'B'],
-            [50.0, 'C'], [0.0, 'D'],
+            [100.5, 'SSS+'],
+            [100.0, 'SSS'],
+            [99.5, 'SS+'],
+            [99.0, 'SS'],
+            [98.0, 'S+'],
+            [97.0, 'S'],
+            [94.0, 'AAA'],
+            [90.0, 'AA'],
+            [80.0, 'A'],
+            [75.0, 'BBB'],
+            [70.0, 'BB'],
+            [60.0, 'B'],
+            [50.0, 'C'],
+            [0.0, 'D'],
         ];
         function rankFromAchv(achvText) {
             const achv = parseFloat(String(achvText).replace('%', ''));
@@ -198,7 +216,14 @@ async function getTopScore(page) {
                 const level = cellText(row, 'levelCell');
                 const achv = cellText(row, 'achievementCell');
                 const rating = cellText(row, 'ratingCell');
-                if (order === null || song === null || level === null || achv === null || rating === null) continue;
+                if (
+                    order === null ||
+                    song === null ||
+                    level === null ||
+                    achv === null ||
+                    rating === null
+                )
+                    continue;
                 out.push({
                     '#': order,
                     Song: song,
@@ -244,7 +269,10 @@ async function getRyanInfo(page, db, formattedDate) {
     // relative or briefly empty pre-hydration — this path was missing that
     // fallback, which would silently store a bad/empty img_src with no
     // error anywhere in the pipeline.
-    const user_img_src = await page.$eval('.w_112.f_l', (el) => el.getAttribute('src') || el.src || null);
+    const user_img_src = await page.$eval(
+        '.w_112.f_l',
+        (el) => el.getAttribute('src') || el.src || null
+    );
     const user_name = await page.$eval('.name_block.f_l.f_16', (el) => el.textContent.trim());
     const user_rating = await page.$eval('.rating_block', (el) => el.textContent.trim());
     const ryan_user_data = {
@@ -288,17 +316,33 @@ async function updateUserData() {
 
     // On Raspberry Pi / ARM, use system Chromium if present (Puppeteer's download is x86 only)
     let executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    if (!executablePath && process.platform === 'linux' && (process.arch === 'arm' || process.arch === 'arm64')) {
-        const candidates = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
+    if (
+        !executablePath &&
+        process.platform === 'linux' &&
+        (process.arch === 'arm' || process.arch === 'arm64')
+    ) {
+        const candidates = [
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/google-chrome',
+        ];
         executablePath = candidates.find((p) => fs.existsSync(p));
     }
     if (executablePath) {
         console.log('[update] using browser:', executablePath);
-    } else if (process.platform === 'linux' && (process.arch === 'arm' || process.arch === 'arm64')) {
-        console.log('[update] no system Chromium found. On ARM the bundled browser is x86 and will fail. Install like Docker does: sudo apt install chromium');
+    } else if (
+        process.platform === 'linux' &&
+        (process.arch === 'arm' || process.arch === 'arm64')
+    ) {
+        console.log(
+            '[update] no system Chromium found. On ARM the bundled browser is x86 and will fail. Install like Docker does: sudo apt install chromium'
+        );
     }
 
-    if (!HEADLESS) console.log('[update] Running with visible browser (HEADLESS=false). Use SSH -X to see it on your machine.');
+    if (!HEADLESS)
+        console.log(
+            '[update] Running with visible browser (HEADLESS=false). Use SSH -X to see it on your machine.'
+        );
     if (SCREENSHOT_DEBUG) console.log('[update] Screenshot debug on: saving to', SCREENSHOT_DIR);
 
     console.log('[update] starting update');
@@ -321,13 +365,18 @@ async function updateUserData() {
             await page.setUserAgent(ua);
             await page.setExtraHTTPHeaders({ 'accept-language': 'en-US,en;q=0.9' });
 
-            await page.goto('https://maimaidx-eng.com', { waitUntil: 'networkidle2', timeout: 60000 });
+            await page.goto('https://maimaidx-eng.com', {
+                waitUntil: 'networkidle2',
+                timeout: 60000,
+            });
             console.log('[update] page loaded');
             await debugScreenshot(page, '01_home');
 
             // click Sega login button if present
             try {
-                const segaBtn = await page.waitForSelector('.c-button--openid--segaId', { timeout: 10000 });
+                const segaBtn = await page.waitForSelector('.c-button--openid--segaId', {
+                    timeout: 10000,
+                });
                 if (segaBtn) {
                     console.log('[update] clicking sega login button');
                     await segaBtn.click();
@@ -341,7 +390,9 @@ async function updateUserData() {
                         const pwd = await page.waitForSelector('#password', { timeout: 20000 });
                         await pwd.click({ clickCount: 3 });
                         await pwd.type(login_pass || '', { delay: 50 });
-                        const loginBtn = await page.waitForSelector('.c-button--login', { timeout: 10000 });
+                        const loginBtn = await page.waitForSelector('.c-button--login', {
+                            timeout: 10000,
+                        });
                         await loginBtn.click();
                         await delay(1000 + Math.random() * 1000);
                         await debugScreenshot(page, '03_after_login');
@@ -354,16 +405,24 @@ async function updateUserData() {
             }
 
             if (await isErrorPage(page)) {
-                console.log(`[attempt ${attemptIdx + 1}] server returned ERROR page after login; retrying`);
+                console.log(
+                    `[attempt ${attemptIdx + 1}] server returned ERROR page after login; retrying`
+                );
                 continue; // cleanup happens in `finally`
             }
 
             // inject helper script (best-effort)
             try {
                 await page.evaluate(() => {
-                    if (["https://maimaidx.jp", "https://maimaidx-eng.com"].indexOf(location.origin) >= 0) {
+                    if (
+                        ['https://maimaidx.jp', 'https://maimaidx-eng.com'].indexOf(
+                            location.origin
+                        ) >= 0
+                    ) {
                         const s = document.createElement('script');
-                        s.src = 'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' + Math.floor(Date.now() / 60000);
+                        s.src =
+                            'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' +
+                            Math.floor(Date.now() / 60000);
                         document.body.appendChild(s);
                     }
                 });
@@ -392,7 +451,10 @@ async function updateUserData() {
             // mai-tools adds "Analyze Rating" link; wait for it to appear (same as friend page)
             try {
                 await page.waitForFunction(
-                    () => Array.from(document.querySelectorAll('a')).some((l) => l.textContent && l.textContent.includes('Analyze Rating')),
+                    () =>
+                        Array.from(document.querySelectorAll('a')).some(
+                            (l) => l.textContent && l.textContent.includes('Analyze Rating')
+                        ),
                     { timeout: 15000 }
                 );
             } catch (e) {
@@ -405,7 +467,9 @@ async function updateUserData() {
                 const newPagePromise = waitForNewPage(browser);
                 const clicked = await page.evaluate(() => {
                     const links = Array.from(document.querySelectorAll('a'));
-                    const a = links.find((l) => l.textContent && l.textContent.includes('Analyze Rating'));
+                    const a = links.find(
+                        (l) => l.textContent && l.textContent.includes('Analyze Rating')
+                    );
                     if (a) {
                         a.click();
                         return true;
@@ -419,7 +483,9 @@ async function updateUserData() {
                     console.log('[update] Done Ryan Score');
                     await targetPage.close();
                 } else {
-                    console.log('[update] Analyze Rating link not found on home page, skipping Ryan score');
+                    console.log(
+                        '[update] Analyze Rating link not found on home page, skipping Ryan score'
+                    );
                 }
             } catch (e) {
                 console.log('[update] analyze rating / ryan score failed', e);
@@ -427,12 +493,20 @@ async function updateUserData() {
 
             // friends scraping: page 1 + page 2, then parallel fetch by friendIdx
             try {
-                await page.goto('https://maimaidx-eng.com/maimai-mobile/friend/', { waitUntil: 'networkidle2' });
+                await page.goto('https://maimaidx-eng.com/maimai-mobile/friend/', {
+                    waitUntil: 'networkidle2',
+                });
                 try {
                     await page.evaluate(() => {
-                        if (["https://maimaidx.jp", "https://maimaidx-eng.com"].indexOf(location.origin) >= 0) {
+                        if (
+                            ['https://maimaidx.jp', 'https://maimaidx-eng.com'].indexOf(
+                                location.origin
+                            ) >= 0
+                        ) {
                             const s = document.createElement('script');
-                            s.src = 'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' + Math.floor(Date.now() / 60000);
+                            s.src =
+                                'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' +
+                                Math.floor(Date.now() / 60000);
                             document.body.appendChild(s);
                         }
                     });
@@ -445,18 +519,27 @@ async function updateUserData() {
 
                 /** For current page: get each friend's link friendIdx (from URL), href, and from same block name/img/rating. */
                 async function collectPageFriends(currentPage) {
-                    await currentPage.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+                    await currentPage.evaluate(() =>
+                        window.scrollTo(0, document.body.scrollHeight)
+                    );
                     return currentPage.evaluate(() => {
-                        const links = Array.from(document.querySelectorAll('a[target="friendRating"]'));
+                        const links = Array.from(
+                            document.querySelectorAll('a[target="friendRating"]')
+                        );
                         return links.map((a) => {
                             let friendIdx = '';
                             try {
                                 const u = new URL(a.href);
                                 friendIdx = u.searchParams.get('friendIdx') || '';
                             } catch (e) {}
-                            const block = a.closest('.see_through_block') || a.closest('.basic_block') || a.parentElement?.closest('div');
+                            const block =
+                                a.closest('.see_through_block') ||
+                                a.closest('.basic_block') ||
+                                a.parentElement?.closest('div');
                             const img = block?.querySelector('.w_112.f_l');
-                            const nameEl = block?.querySelector('.name_block.t_l.f_l.f_16.underline, .name_block.underline');
+                            const nameEl = block?.querySelector(
+                                '.name_block.t_l.f_l.f_16.underline, .name_block.underline'
+                            );
                             const ratingEl = block?.querySelector('.rating_block');
                             return {
                                 friendIdx,
@@ -471,7 +554,9 @@ async function updateUserData() {
 
                 // Page 1: collect user_info and task list; then click each "Analyze Rating" on this page (opens SEGA top-record tab)
                 const page1Friends = await collectPageFriends(page);
-                const page1Tasks = page1Friends.filter((f) => f.friendIdx && f.href).map((f) => ({ friendIdx: f.friendIdx }));
+                const page1Tasks = page1Friends
+                    .filter((f) => f.friendIdx && f.href)
+                    .map((f) => ({ friendIdx: f.friendIdx }));
                 await insertFriendUserInfo(db, formattedDate, page1Friends);
                 allTasks.push(...page1Tasks);
 
@@ -490,7 +575,9 @@ async function updateUserData() {
                         try {
                             newPage = await newPagePromise;
                         } catch (e) {
-                            console.log(`[update] failed friend_${friendIdx}: no new tab (${e.message})`);
+                            console.log(
+                                `[update] failed friend_${friendIdx}: no new tab (${e.message})`
+                            );
                             continue;
                         }
                         await debugScreenshot(newPage, `05_friend_${friendIdx}`);
@@ -513,7 +600,9 @@ async function updateUserData() {
                     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
                     await delay(500);
                     const clicked = await page.evaluate(() => {
-                        const form = document.querySelector('body > div.wrapper.main_wrapper.t_c > form') || document.querySelector('div.wrapper form');
+                        const form =
+                            document.querySelector('body > div.wrapper.main_wrapper.t_c > form') ||
+                            document.querySelector('div.wrapper form');
                         if (!form) return false;
                         const nextImg = form.querySelector('img[src*="btn_next"]');
                         if (!nextImg) return false;
@@ -528,17 +617,36 @@ async function updateUserData() {
                         const page1IdList = page1Tasks.map((t) => t.friendIdx);
                         try {
                             await Promise.race([
-                                page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 12000 }),
+                                page.waitForNavigation({
+                                    waitUntil: 'networkidle2',
+                                    timeout: 12000,
+                                }),
                                 (async () => {
                                     for (let i = 0; i < 24; i++) {
                                         await delay(500);
                                         const ids = await page.evaluate((excludeList) => {
-                                            const links = Array.from(document.querySelectorAll('a[target="friendRating"]'));
-                                            return links.map((a) => {
-                                                try { return new URL(a.href).searchParams.get('friendIdx'); } catch { return null; }
-                                            }).filter(Boolean);
+                                            const links = Array.from(
+                                                document.querySelectorAll(
+                                                    'a[target="friendRating"]'
+                                                )
+                                            );
+                                            return links
+                                                .map((a) => {
+                                                    try {
+                                                        return new URL(a.href).searchParams.get(
+                                                            'friendIdx'
+                                                        );
+                                                    } catch {
+                                                        return null;
+                                                    }
+                                                })
+                                                .filter(Boolean);
                                         }, page1IdList);
-                                        if (ids.length > 0 && ids.some((id) => !excludeList.includes(id))) return;
+                                        if (
+                                            ids.length > 0 &&
+                                            ids.some((id) => !excludeList.includes(id))
+                                        )
+                                            return;
                                     }
                                     throw new Error('timeout');
                                 })(),
@@ -549,20 +657,30 @@ async function updateUserData() {
                         await delay(800);
                         try {
                             await page.evaluate(() => {
-                                if (["https://maimaidx.jp", "https://maimaidx-eng.com"].indexOf(location.origin) >= 0) {
+                                if (
+                                    ['https://maimaidx.jp', 'https://maimaidx-eng.com'].indexOf(
+                                        location.origin
+                                    ) >= 0
+                                ) {
                                     const s = document.createElement('script');
-                                    s.src = 'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' + Math.floor(Date.now() / 60000);
+                                    s.src =
+                                        'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' +
+                                        Math.floor(Date.now() / 60000);
                                     document.body.appendChild(s);
                                 }
                             });
                         } catch (e) {}
                         await delay(2500);
                         const page2Friends = await collectPageFriends(page);
-                        const page2Tasks = page2Friends.filter((f) => f.friendIdx && f.href).map((f) => ({ friendIdx: f.friendIdx }));
+                        const page2Tasks = page2Friends
+                            .filter((f) => f.friendIdx && f.href)
+                            .map((f) => ({ friendIdx: f.friendIdx }));
                         const page1IdSet = new Set(page1IdList);
                         const newOnPage2 = page2Tasks.filter((t) => !page1IdSet.has(t.friendIdx));
                         if (newOnPage2.length === 0) {
-                            console.log('[update] page 2: no new friends (list unchanged or only one page)');
+                            console.log(
+                                '[update] page 2: no new friends (list unchanged or only one page)'
+                            );
                         } else {
                             // Only insert/scrape friends we haven't already handled on page 1.
                             // Previously the whole of page 2 was re-scraped, duplicating any
@@ -573,11 +691,16 @@ async function updateUserData() {
                                 page2Friends.filter((f) => !page1IdSet.has(f.friendIdx))
                             );
                             allTasks.push(...newOnPage2);
-                            console.log('[update] collected friends from page 2:', newOnPage2.length);
+                            console.log(
+                                '[update] collected friends from page 2:',
+                                newOnPage2.length
+                            );
                             await scrapeFriendsSequential(page, page2Tasks, page1IdSet);
                         }
                     } else {
-                        console.log('[update] page 2: pagination button not found (only one page of friends?)');
+                        console.log(
+                            '[update] page 2: pagination button not found (only one page of friends?)'
+                        );
                     }
                 } catch (e2) {
                     console.log('[update] no second page or failed to load:', e2.message);
@@ -592,10 +715,14 @@ async function updateUserData() {
             console.log('[update] Unhandled exception during attempt:', e);
         } finally {
             if (client) {
-                await client.close().catch((err) => console.log('[update] mongo close failed:', err.message));
+                await client
+                    .close()
+                    .catch((err) => console.log('[update] mongo close failed:', err.message));
             }
             if (browser) {
-                await browser.close().catch((err) => console.log('[update] browser close failed:', err.message));
+                await browser
+                    .close()
+                    .catch((err) => console.log('[update] browser close failed:', err.message));
             }
         }
     }

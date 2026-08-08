@@ -11,10 +11,7 @@ module.exports = {
                 .setName('accounttype')
                 .setDescription('Which maimai friend account snapshot to use (fy/main)')
                 .setRequired(true)
-                .addChoices(
-                    { name: 'FY', value: 'fy' },
-                    { name: 'Main', value: 'main' }
-                )
+                .addChoices({ name: 'FY', value: 'fy' }, { name: 'Main', value: 'main' })
         )
         .addStringOption((option) =>
             option
@@ -33,11 +30,15 @@ module.exports = {
             const webhookMode = interaction.options.getString('webhookmode', true);
 
             const webhookUrl =
-                webhookMode === 'test' ? config.FRIEND_WEBHOOK_URL_TEST : config.FRIEND_WEBHOOK_URL_FY;
+                webhookMode === 'test'
+                    ? config.FRIEND_WEBHOOK_URL_TEST
+                    : config.FRIEND_WEBHOOK_URL_FY;
 
             const result = await executeLatest({ webhookUrl, accountType });
             if (result && result.ok) {
-                await interaction.editReply(`Latest friend leaderboard posted. Friends: ${result.friendsCount}`);
+                await interaction.editReply(
+                    `Latest friend leaderboard posted. Friends: ${result.friendsCount}`
+                );
             } else {
                 await interaction.editReply(
                     `Latest friend leaderboard did not complete.${result && result.reason ? ` (${result.reason})` : ''}`
@@ -45,8 +46,9 @@ module.exports = {
             }
         } catch (err) {
             console.error('Error running executeLatest():', err);
-            await interaction.editReply('Failed to post latest friend leaderboard. Check bot logs.');
+            await interaction.editReply(
+                'Failed to post latest friend leaderboard. Check bot logs.'
+            );
         }
     },
 };
-

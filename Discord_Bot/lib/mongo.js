@@ -30,9 +30,7 @@ function candidateUris() {
     }
 
     const needsLocalFallback = !primary || host === 'mongodb';
-    const uris = needsLocalFallback
-        ? [primary, 'mongodb://127.0.0.1:27017/mydatabase']
-        : [primary];
+    const uris = needsLocalFallback ? [primary, 'mongodb://127.0.0.1:27017/mydatabase'] : [primary];
 
     return [...new Set(uris.filter(Boolean))];
 }

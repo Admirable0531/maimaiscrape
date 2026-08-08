@@ -30,7 +30,9 @@ for (const folder of fs.readdirSync(foldersPath)) {
         if ('data' in command && 'execute' in command) {
             commands.push(command.data.toJSON());
         } else {
-            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+            console.log(
+                `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
+            );
         }
     }
 }
@@ -39,7 +41,9 @@ for (const folder of fs.readdirSync(foldersPath)) {
     const rest = new REST().setToken(token);
     try {
         console.log(`Started refreshing ${commands.length} application (/) commands.`);
-        const data = await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
+        const data = await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+            body: commands,
+        });
         console.log(`Successfully reloaded ${data.length} application (/) commands.`);
         for (const command of data) {
             console.log(`  /${command.name}`);

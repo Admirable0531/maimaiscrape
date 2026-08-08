@@ -14,7 +14,9 @@ const {
 const LABEL = 'friendsrating';
 
 function getSnapshotCollectionName(accountType) {
-    return accountType === 'main' ? 'friend_rating_daily_snapshots_main' : 'friend_rating_daily_snapshots';
+    return accountType === 'main'
+        ? 'friend_rating_daily_snapshots_main'
+        : 'friend_rating_daily_snapshots';
 }
 
 /** Normalises a snapshot's friends array into sorted {friendIdx, name, ratingNum}. */
@@ -23,14 +25,19 @@ function toSortedFriends(friends) {
         .map((f) => ({
             friendIdx: f.friendIdx,
             name: f.name,
-            ratingNum: f.rating != null ? parseRatingToNumber(f.rating) : parseRatingToNumber(f.ratingText),
+            ratingNum:
+                f.rating != null
+                    ? parseRatingToNumber(f.rating)
+                    : parseRatingToNumber(f.ratingText),
         }))
         .filter((f) => f.friendIdx && f.ratingNum != null)
         .sort((a, b) => b.ratingNum - a.ratingNum);
 }
 
 function buildLeaderboardEmbeds({ fromDay, toDay, todaySorted, previousByIdx }) {
-    const title = fromDay ? `${snapshotDayToDDMM(fromDay)} -> ${snapshotDayToDDMM(toDay)}` : snapshotDayToDDMM(toDay);
+    const title = fromDay
+        ? `${snapshotDayToDDMM(fromDay)} -> ${snapshotDayToDDMM(toDay)}`
+        : snapshotDayToDDMM(toDay);
 
     const lines = todaySorted.map((friend, index) => {
         const rankTo = index + 1;
@@ -99,12 +106,18 @@ async function execute(options = {}) {
         (await col.findOne({}, { sort: { snapshotDate: -1 } }));
 
     if (!todayDoc) {
-        await report(target, 'No friend rating snapshots stored yet — run /updatefriendsdata first.');
+        await report(
+            target,
+            'No friend rating snapshots stored yet — run /updatefriendsdata first.'
+        );
         return { ok: false, reason: 'no snapshots' };
     }
 
     const toDay = todayDoc.snapshotDate;
-    const previousDoc = await col.findOne({ snapshotDate: { $lt: toDay } }, { sort: { snapshotDate: -1 } });
+    const previousDoc = await col.findOne(
+        { snapshotDate: { $lt: toDay } },
+        { sort: { snapshotDate: -1 } }
+    );
 
     const todaySorted = toSortedFriends(todayDoc.friends);
     if (todaySorted.length === 0) {
@@ -115,7 +128,10 @@ async function execute(options = {}) {
     const previousByIdx = new Map();
     if (previousDoc) {
         toSortedFriends(previousDoc.friends).forEach((friend, index) => {
-            previousByIdx.set(String(friend.friendIdx), { rank: index + 1, ratingNum: friend.ratingNum });
+            previousByIdx.set(String(friend.friendIdx), {
+                rank: index + 1,
+                ratingNum: friend.ratingNum,
+            });
         });
     } else {
         console.log(`[${LABEL}] no earlier snapshot than ${toDay}; posting without deltas`);
@@ -129,7 +145,11 @@ async function execute(options = {}) {
     });
 
     await report(target, embeds);
-    return { ok: true, friendsCount: todaySorted.length, comparedAgainst: previousDoc?.snapshotDate ?? null };
+    return {
+        ok: true,
+        friendsCount: todaySorted.length,
+        comparedAgainst: previousDoc?.snapshotDate ?? null,
+    };
 }
 
 module.exports = { execute };

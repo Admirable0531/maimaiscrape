@@ -43,7 +43,14 @@ module.exports = {
     DB_NAME: env('DB_NAME', 'mydatabase'),
 
     // 'ryan' = main user (ryan_top); rest = friendIdx from link (friend_<id>_top)
-    users: ['ryan', '6020500221031', '8071982688053', '8085423055111', '8070962675681', '8091021494559'],
+    users: [
+        'ryan',
+        '6020500221031',
+        '8071982688053',
+        '8085423055111',
+        '8070962675681',
+        '8091021494559',
+    ],
     dailyScoreChannelID: env('DAILY_SCORE_CHANNEL_ID', '1233678655717118022'),
     // Main-account friend leaderboard has no webhook (unlike FY, which uses
     // FRIEND_WEBHOOK_URL_FY) — it posts via the bot client to this channel id,

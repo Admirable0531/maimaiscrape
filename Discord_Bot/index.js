@@ -37,7 +37,9 @@ for (const folder of fs.readdirSync(foldersPath)) {
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
         } else {
-            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+            console.log(
+                `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
+            );
         }
     }
 }
@@ -149,7 +151,10 @@ client.once(Events.ClientReady, (readyClient) => {
 
     if (DAILY_PIPELINE_ENABLED) {
         scheduleJob('daily-pipeline', DAILY_PIPELINE_AT, '22:45', async () => {
-            const scoreChannel = await getRequiredChannel(config.dailyScoreChannelID, 'daily score');
+            const scoreChannel = await getRequiredChannel(
+                config.dailyScoreChannelID,
+                'daily score'
+            );
             const mainLeaderboardChannel = await getOptionalChannel(
                 config.mainLeaderboardChannelID,
                 'main leaderboard'
@@ -157,7 +162,9 @@ client.once(Events.ClientReady, (readyClient) => {
             await dailyPipeline.run({ scoreChannel, mainLeaderboardChannel });
         });
     } else {
-        console.log('[bot] DAILY_PIPELINE_ENABLED=false — daily scrape/post disabled; use /scraper and /update.');
+        console.log(
+            '[bot] DAILY_PIPELINE_ENABLED=false — daily scrape/post disabled; use /scraper and /update.'
+        );
     }
 
     // Circle rankings run once a day, after maimai's maintenance window ends.

@@ -13,7 +13,8 @@ const config = require('../config');
  */
 
 const HEADLESS = process.env.HEADLESS !== 'false' && process.env.HEADLESS !== '0';
-const SCREENSHOT_DEBUG = process.env.SCREENSHOT_DEBUG === '1' || process.env.SCREENSHOT_DEBUG === 'true';
+const SCREENSHOT_DEBUG =
+    process.env.SCREENSHOT_DEBUG === '1' || process.env.SCREENSHOT_DEBUG === 'true';
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR || 'screenshots';
 
 const FALLBACK_UA =
@@ -44,10 +45,15 @@ function makeScreenshotter(prefix) {
 /** Resolves the Chromium binary. On ARM the bundled Puppeteer browser is x86 and won't run. */
 function resolveExecutablePath(label) {
     let executablePath = config.CHROME_EXECUTABLE_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
-    const isArmLinux = process.platform === 'linux' && (process.arch === 'arm' || process.arch === 'arm64');
+    const isArmLinux =
+        process.platform === 'linux' && (process.arch === 'arm' || process.arch === 'arm64');
 
     if (!executablePath && isArmLinux) {
-        const candidates = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
+        const candidates = [
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/google-chrome',
+        ];
         executablePath = candidates.find((p) => fs.existsSync(p));
     }
     if (executablePath) {
@@ -122,7 +128,14 @@ async function isErrorPage(page, label) {
         if (hasErrorTitle || hasAimeError || hasErrEl || hasNoScript) {
             console.log(
                 `[${label}][isErrorPage] true`,
-                JSON.stringify({ url: page.url(), title, hasErrorTitle, hasAimeError, hasErrEl, hasNoScript })
+                JSON.stringify({
+                    url: page.url(),
+                    title,
+                    hasErrorTitle,
+                    hasAimeError,
+                    hasErrEl,
+                    hasNoScript,
+                })
             );
             return true;
         }
@@ -165,7 +178,9 @@ async function submitCredentials(page, { sid: user, password: pass }, label, sho
 
     if (!pwdTyped && pass) {
         await page.evaluate((value) => {
-            const input = document.querySelector('#password') || document.querySelector('input[type="password"]');
+            const input =
+                document.querySelector('#password') ||
+                document.querySelector('input[type="password"]');
             if (input) input.value = value;
         }, pass);
         console.log(`[${label}] password set via JS value`);
@@ -213,7 +228,12 @@ async function login(page, credentials, label, shot, attempt) {
             await loginBtn.click();
             await delay(1000 + Math.random() * 1000);
         }
-        console.log(`[${label}] after login submit, url =`, page.url(), 'title =', await page.title());
+        console.log(
+            `[${label}] after login submit, url =`,
+            page.url(),
+            'title =',
+            await page.title()
+        );
         await shot(page, `05_after_login_attempt${attempt}`);
     } catch (err) {
         console.log(`[${label}] login inputs not found or already logged in:`, err.message);
@@ -263,7 +283,9 @@ async function withMaimaiSession({ credentials, label, task, fallback = null }) 
 
             if (await isErrorPage(page, label)) {
                 await shot(page, `06_error_attempt${attempt}`);
-                console.log(`[${label}][attempt ${attempt}] SEGA returned an ERROR page after login; retrying`);
+                console.log(
+                    `[${label}][attempt ${attempt}] SEGA returned an ERROR page after login; retrying`
+                );
                 continue;
             }
 
@@ -272,7 +294,9 @@ async function withMaimaiSession({ credentials, label, task, fallback = null }) 
             console.log(`[${label}] unhandled exception during attempt ${attempt}:`, err.message);
         } finally {
             if (browser) {
-                await browser.close().catch((err) => console.log(`[${label}] browser close failed:`, err.message));
+                await browser
+                    .close()
+                    .catch((err) => console.log(`[${label}] browser close failed:`, err.message));
             }
         }
     }

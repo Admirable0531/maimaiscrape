@@ -42,7 +42,11 @@ function calculateLevel(constantValue) {
 function injectMaiTools(page) {
     return page.evaluate((scriptSrc) => {
         return new Promise((resolve) => {
-            if (!['https://maimaidx.jp', 'https://maimaidx-eng.com'].includes(window.location.origin)) {
+            if (
+                !['https://maimaidx.jp', 'https://maimaidx-eng.com'].includes(
+                    window.location.origin
+                )
+            ) {
                 resolve();
                 return;
             }
@@ -67,11 +71,16 @@ function extractSongs(page, constantValue, percentSelector) {
                 .map((block) => {
                     const levelEl = block.querySelector('.music_lv_block.f_r.t_c.f_14');
                     if (!levelEl) return null;
-                    if ((levelEl.getAttribute('data-inlv') || 'N/A') !== targetConstant) return null;
+                    if ((levelEl.getAttribute('data-inlv') || 'N/A') !== targetConstant)
+                        return null;
 
                     const name =
-                        block.querySelector('.music_name_block.t_l.f_13.break')?.textContent.trim() || 'Unknown';
-                    const difficulty = block.classList.contains('music_remaster_score_back') ? 'ReMAS' : 'MAS';
+                        block
+                            .querySelector('.music_name_block.t_l.f_13.break')
+                            ?.textContent.trim() || 'Unknown';
+                    const difficulty = block.classList.contains('music_remaster_score_back')
+                        ? 'ReMAS'
+                        : 'MAS';
 
                     let percentage = 'N/A';
                     if (percentSel === 'versus') {
@@ -79,8 +88,9 @@ function extractSongs(page, constantValue, percentSelector) {
                         if (scores.length > 1) percentage = scores[1].textContent.trim();
                     } else {
                         percentage =
-                            block.querySelector('.music_score_block.w_112.t_r.f_l.f_12')?.textContent.trim() ||
-                            'N/A';
+                            block
+                                .querySelector('.music_score_block.w_112.t_r.f_l.f_12')
+                                ?.textContent.trim() || 'N/A';
                     }
                     return [name, difficulty, percentage];
                 })
@@ -150,7 +160,9 @@ async function scrapeConstant(constantValue, friendIdx) {
     } finally {
         // Single close: the old code called browser.close() in catch *and*
         // twice more in finally.
-        await browser.close().catch((err) => console.error('[constant] browser close failed:', err.message));
+        await browser
+            .close()
+            .catch((err) => console.error('[constant] browser close failed:', err.message));
     }
 }
 
@@ -171,7 +183,9 @@ module.exports = {
                 .setDescription('The difficulty constant you want (14.0 - 15.0)')
                 .setRequired(true)
         )
-        .addStringOption((option) => option.setName('guy').setDescription('Whose scores to look up')),
+        .addStringOption((option) =>
+            option.setName('guy').setDescription('Whose scores to look up')
+        ),
 
     async execute(interaction) {
         await interaction.deferReply();
@@ -215,7 +229,9 @@ module.exports = {
             songs = await scrapeConstant(constantValue, friendIdx);
         } catch (err) {
             console.error('[constant] scrape failed:', err);
-            await interaction.editReply('Failed to fetch scores from maimai DX NET. Check the bot logs.');
+            await interaction.editReply(
+                'Failed to fetch scores from maimai DX NET. Check the bot logs.'
+            );
             return;
         }
 
@@ -226,7 +242,9 @@ module.exports = {
 
         songs.sort((a, b) => achievementValue(b[2]) - achievementValue(a[2]));
 
-        const lines = songs.map(([name, difficulty, percentage]) => `${name}: ${difficulty} - ${percentage}`);
+        const lines = songs.map(
+            ([name, difficulty, percentage]) => `${name}: ${difficulty} - ${percentage}`
+        );
         // A description over 4096 characters makes Discord reject the embed, so
         // long result sets are split across several.
         const chunks = chunkLines(lines, 4000);

@@ -15,7 +15,9 @@ function collectFriendsFromCurrentPage(page) {
         for (const block of blocks) {
             const basic = block.querySelector('.basic_block') || block;
             const img = basic.querySelector('img.w_112.f_l');
-            const nameEl = basic.querySelector('.name_block.t_l.f_l.f_16.underline, .name_block.underline');
+            const nameEl = basic.querySelector(
+                '.name_block.t_l.f_l.f_16.underline, .name_block.underline'
+            );
             const ratingEl = basic.querySelector('.rating_block');
 
             // idx lives in a hidden input inside the friendDetail form
@@ -82,7 +84,9 @@ async function scrapeAllFriends(page, maxPages = 50) {
     for (let i = 0; i < maxPages; i++) {
         await page.waitForSelector('body', { visible: true, timeout: 60000 });
         const pageInfo = await getFriendPaginationInfo(page);
-        console.log(`[${LABEL}] scraping friend page ${pageInfo.current}/${pageInfo.total} (raw ${pageInfo.raw})`);
+        console.log(
+            `[${LABEL}] scraping friend page ${pageInfo.current}/${pageInfo.total} (raw ${pageInfo.raw})`
+        );
 
         const onPage = await collectFriendsFromCurrentPage(page);
         if (onPage.length === 0 && i > 0) break;
@@ -107,12 +111,16 @@ async function scrapeAllFriends(page, maxPages = 50) {
 }
 
 function getSnapshotCollectionName(accountType) {
-    return accountType === 'main' ? 'friend_rating_daily_snapshots_main' : 'friend_rating_daily_snapshots';
+    return accountType === 'main'
+        ? 'friend_rating_daily_snapshots_main'
+        : 'friend_rating_daily_snapshots';
 }
 
 function getAccountCredentials(accountType) {
     const sid =
-        accountType === 'main' ? config.MAIMAI_ACCOUNT_RATING_MAIN : config.MAIMAI_ACCOUNT_RATING_FY;
+        accountType === 'main'
+            ? config.MAIMAI_ACCOUNT_RATING_MAIN
+            : config.MAIMAI_ACCOUNT_RATING_FY;
     // MAIMAI_PASSWORD_RATING_MAIN is optional and falls back to the fy
     // password — only set it if the main account actually uses a different
     // one. Previously both accounts always shared MAIMAI_PASSWORD_RATING
@@ -153,7 +161,9 @@ async function saveFriendRatingsSnapshot(friends, accountType = 'fy') {
         { upsert: true }
     );
 
-    console.log(`[${LABEL}][save] saved ${mappedFriends.length} friends for ${snapshotDate} (${accountType})`);
+    console.log(
+        `[${LABEL}][save] saved ${mappedFriends.length} friends for ${snapshotDate} (${accountType})`
+    );
     return true;
 }
 
@@ -191,7 +201,8 @@ async function run(opts = {}) {
     const doSave = opts.saveToMongo ?? true;
     const accountType = opts.accountType === 'main' ? 'main' : 'fy';
     const webhookType = opts.webhookType === 'test' ? 'test' : 'fy';
-    const webhookUrl = webhookType === 'test' ? config.FRIEND_WEBHOOK_URL_TEST : config.FRIEND_WEBHOOK_URL_FY;
+    const webhookUrl =
+        webhookType === 'test' ? config.FRIEND_WEBHOOK_URL_TEST : config.FRIEND_WEBHOOK_URL_FY;
 
     const credentials = getAccountCredentials(accountType);
     if (!credentials.sid || !credentials.password) {

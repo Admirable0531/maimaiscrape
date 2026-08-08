@@ -32,13 +32,16 @@ module.exports = {
         // this command was typed — so a manual /daily and the 22:45 cron are
         // never inconsistent about where things end up.
         await interaction.reply({
-            content: 'Starting the daily update — results post to their usual channels. Summary follows here.',
+            content:
+                'Starting the daily update — results post to their usual channels. Summary follows here.',
             flags: MessageFlags.Ephemeral,
         });
 
         const scoreChannel = await interaction.client.channels.fetch(config.dailyScoreChannelID);
         const mainLeaderboardChannel = config.mainLeaderboardChannelID
-            ? await interaction.client.channels.fetch(config.mainLeaderboardChannelID).catch(() => null)
+            ? await interaction.client.channels
+                  .fetch(config.mainLeaderboardChannelID)
+                  .catch(() => null)
             : null;
 
         const steps = STEP_SETS[interaction.options.getString('steps') || 'all'];
@@ -53,6 +56,8 @@ module.exports = {
                 content: `Daily update finished in ${result.totalSeconds}s.\n${summary}`,
                 flags: MessageFlags.Ephemeral,
             })
-            .catch((err) => console.error('[daily] could not send the summary follow-up:', err.message));
+            .catch((err) =>
+                console.error('[daily] could not send the summary follow-up:', err.message)
+            );
     },
 };

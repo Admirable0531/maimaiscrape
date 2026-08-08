@@ -11,10 +11,7 @@ module.exports = {
                 .setName('accounttype')
                 .setDescription('Which maimai friend account to compare (fy/main)')
                 .setRequired(true)
-                .addChoices(
-                    { name: 'FY', value: 'fy' },
-                    { name: 'Main', value: 'main' }
-                )
+                .addChoices({ name: 'FY', value: 'fy' }, { name: 'Main', value: 'main' })
         )
         .addStringOption((option) =>
             option
@@ -33,18 +30,25 @@ module.exports = {
             const webhookMode = interaction.options.getString('webhookmode', true);
 
             const webhookUrl =
-                webhookMode === 'test' ? config.FRIEND_WEBHOOK_URL_TEST : config.FRIEND_WEBHOOK_URL_FY;
+                webhookMode === 'test'
+                    ? config.FRIEND_WEBHOOK_URL_TEST
+                    : config.FRIEND_WEBHOOK_URL_FY;
 
             const result = await updateFriendRatings.execute({ webhookUrl, accountType });
             if (result && result.ok) {
-                await interaction.editReply('Friend rating comparison completed and sent to the webhook.');
+                await interaction.editReply(
+                    'Friend rating comparison completed and sent to the webhook.'
+                );
             } else {
-                await interaction.editReply(`Friend rating comparison did not complete.${result && result.reason ? ` (${result.reason})` : ''}`);
+                await interaction.editReply(
+                    `Friend rating comparison did not complete.${result && result.reason ? ` (${result.reason})` : ''}`
+                );
             }
         } catch (err) {
             console.error('Error running updateFriendRatings.execute():', err);
-            await interaction.editReply('Failed to run friend rating comparison. Check bot logs for details.');
+            await interaction.editReply(
+                'Failed to run friend rating comparison. Check bot logs for details.'
+            );
         }
     },
 };
-

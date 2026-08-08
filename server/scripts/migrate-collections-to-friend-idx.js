@@ -21,7 +21,8 @@ const { MongoClient } = require('mongodb');
 const { OLD_NAME_TO_FRIEND_IDX, getTopCollectionName } = require('../collectionNames');
 
 // MONGO_URI_LOCAL overrides for running script on host (mongodb:27017 only resolves inside Docker)
-const MONGO_URI = process.env.MONGO_URI_LOCAL || process.env.MONGO_URI || 'mongodb://localhost:27017/';
+const MONGO_URI =
+    process.env.MONGO_URI_LOCAL || process.env.MONGO_URI || 'mongodb://localhost:27017/';
 const DB_NAME = process.env.MONGO_DB || 'mydatabase';
 
 async function main() {
@@ -45,7 +46,9 @@ async function main() {
         const docs = await oldCol.find({}).toArray();
         if (docs.length > 0) {
             await newCol.insertMany(docs);
-            console.log(`[migrate] ${oldColName} -> ${newColName} (friendIdx ${friendIdx}): ${docs.length} documents`);
+            console.log(
+                `[migrate] ${oldColName} -> ${newColName} (friendIdx ${friendIdx}): ${docs.length} documents`
+            );
         }
     }
 
@@ -57,12 +60,16 @@ async function main() {
             { $set: { user: String(friendIdx), friendIdx } }
         );
         if (result.modifiedCount > 0) {
-            console.log(`[migrate] user_info: ${oldName} -> user '${friendIdx}' (friendIdx ${friendIdx}): ${result.modifiedCount} updated`);
+            console.log(
+                `[migrate] user_info: ${oldName} -> user '${friendIdx}' (friendIdx ${friendIdx}): ${result.modifiedCount} updated`
+            );
         }
     }
 
     await client.close();
-    console.log('[migrate] done. Old *_top collections were left in place; drop them manually if desired.');
+    console.log(
+        '[migrate] done. Old *_top collections were left in place; drop them manually if desired.'
+    );
 }
 
 main().catch((err) => {

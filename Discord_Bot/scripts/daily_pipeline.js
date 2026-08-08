@@ -39,7 +39,9 @@ async function callApi(endpoint, { timeoutMs = SCRAPE_TIMEOUT_MS, body } = {}) {
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || !payload.success) {
-        throw new Error(`${endpoint} returned ${response.status}${payload.error ? `: ${payload.error}` : ''}`);
+        throw new Error(
+            `${endpoint} returned ${response.status}${payload.error ? `: ${payload.error}` : ''}`
+        );
     }
     return payload;
 }
@@ -114,7 +116,10 @@ async function postMainLeaderboard(mainLeaderboardChannel) {
     if (!mainLeaderboardChannel) {
         return 'skipped (MAIN_LEADERBOARD_CHANNEL_ID not set)';
     }
-    const result = await updateFriendRatings.execute({ channel: mainLeaderboardChannel, accountType: 'main' });
+    const result = await updateFriendRatings.execute({
+        channel: mainLeaderboardChannel,
+        accountType: 'main',
+    });
     if (!result.ok) throw new Error(result.reason || 'main leaderboard failed');
     return `leaderboard posted for ${result.friendsCount} friends`;
 }
@@ -151,7 +156,8 @@ async function run({ scoreChannel, mainLeaderboardChannel = null, steps: only } 
             results.push({ name: step.name, ok: true, detail, seconds });
         } catch (err) {
             const seconds = Math.round((Date.now() - stepStarted) / 1000);
-            const message = err.name === 'TimeoutError' ? `timed out after ${seconds}s` : err.message;
+            const message =
+                err.name === 'TimeoutError' ? `timed out after ${seconds}s` : err.message;
             console.error(`[${LABEL}] ${step.name}: FAILED (${seconds}s) — ${message}`);
             results.push({ name: step.name, ok: false, detail: message, seconds });
         }
@@ -166,7 +172,11 @@ async function run({ scoreChannel, mainLeaderboardChannel = null, steps: only } 
             .setColor(0xff0000)
             .setTitle('⚠️ Daily update had problems')
             .setDescription(
-                results.map((r) => `${r.ok ? '✅' : '❌'} \`${r.name}\` — ${r.detail} _(${r.seconds}s)_`).join('\n')
+                results
+                    .map(
+                        (r) => `${r.ok ? '✅' : '❌'} \`${r.name}\` — ${r.detail} _(${r.seconds}s)_`
+                    )
+                    .join('\n')
             )
             .setFooter({ text: `Total ${totalSeconds}s • ${new Date().toLocaleString()}` });
         // The summary always goes to scoreChannel: it's the one destination

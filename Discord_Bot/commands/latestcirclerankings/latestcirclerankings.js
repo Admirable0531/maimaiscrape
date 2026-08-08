@@ -7,7 +7,9 @@ const COLLECTION = 'circle_rankings';
 
 function toRankMap(rankings) {
     const map = new Map();
-    sortRankings(rankings).forEach((r, index) => map.set(r.groupName, { rank: index + 1, points: r.points }));
+    sortRankings(rankings).forEach((r, index) =>
+        map.set(r.groupName, { rank: index + 1, points: r.points })
+    );
     return map;
 }
 
@@ -70,7 +72,9 @@ module.exports = {
             });
 
             const scrapedAt =
-                latest.scrapedAt instanceof Date ? latest.scrapedAt.toLocaleString() : String(latest.scrapedAt);
+                latest.scrapedAt instanceof Date
+                    ? latest.scrapedAt.toLocaleString()
+                    : String(latest.scrapedAt);
             const footer = {
                 text:
                     `Showing ${shown.length} of ${ranked.length} circles • Scraped: ${scrapedAt}` +
@@ -82,7 +86,11 @@ module.exports = {
             // fields across 10 embeds could otherwise exceed.
             const embeds = chunkLines(lines, 3000, 30).map((description, index) =>
                 new EmbedBuilder()
-                    .setTitle(index === 0 ? 'Latest Circle Rankings' : `Latest Circle Rankings (cont. ${index + 1})`)
+                    .setTitle(
+                        index === 0
+                            ? 'Latest Circle Rankings'
+                            : `Latest Circle Rankings (cont. ${index + 1})`
+                    )
                     .setColor(0x7289da)
                     .setDescription(description)
                     .setFooter(footer)

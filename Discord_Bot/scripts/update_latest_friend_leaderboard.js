@@ -12,7 +12,9 @@ const {
 const LABEL = 'latestleaderboard';
 
 function getSnapshotCollectionName(accountType) {
-    return accountType === 'main' ? 'friend_rating_daily_snapshots_main' : 'friend_rating_daily_snapshots';
+    return accountType === 'main'
+        ? 'friend_rating_daily_snapshots_main'
+        : 'friend_rating_daily_snapshots';
 }
 
 /** Posts the newest stored friend leaderboard with no comparison arrows. */
@@ -42,7 +44,10 @@ async function executeLatest(options = {}) {
         .map((f) => ({
             friendIdx: f.friendIdx,
             name: f.name,
-            ratingNum: f.rating != null ? parseRatingToNumber(f.rating) : parseRatingToNumber(f.ratingText),
+            ratingNum:
+                f.rating != null
+                    ? parseRatingToNumber(f.rating)
+                    : parseRatingToNumber(f.ratingText),
         }))
         .filter((f) => f.friendIdx && f.ratingNum != null)
         .sort((a, b) => b.ratingNum - a.ratingNum);

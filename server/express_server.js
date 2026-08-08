@@ -50,14 +50,23 @@ function fetchBinary(url, redirectsLeft = 3) {
         transport
             .get(parsed, options, (res) => {
                 const { statusCode = 0, headers } = res;
-                if (statusCode >= 300 && statusCode < 400 && headers.location && redirectsLeft > 0) {
+                if (
+                    statusCode >= 300 &&
+                    statusCode < 400 &&
+                    headers.location &&
+                    redirectsLeft > 0
+                ) {
                     res.resume();
-                    resolve(fetchBinary(new URL(headers.location, parsed).toString(), redirectsLeft - 1));
+                    resolve(
+                        fetchBinary(new URL(headers.location, parsed).toString(), redirectsLeft - 1)
+                    );
                     return;
                 }
                 if (statusCode < 200 || statusCode >= 300) {
                     res.resume();
-                    reject(Object.assign(new Error(`upstream returned ${statusCode}`), { statusCode }));
+                    reject(
+                        Object.assign(new Error(`upstream returned ${statusCode}`), { statusCode })
+                    );
                     return;
                 }
                 const chunks = [];
@@ -119,11 +128,11 @@ app.get('/users/:username/top-score', async (req, res) => {
         const collection = db.collection(collectionName);
 
         const topScore = await collection.findOne({}, { sort: { _id: -1 } });
-        
+
         if (!topScore) {
             return res.status(404).json({ success: false, error: 'No top score found' });
         }
-        
+
         res.json(topScore);
     } catch (err) {
         console.error('[server] /users/:username/top-score error:', err);
@@ -142,7 +151,11 @@ app.get('/users/:username/scores-by-date', async (req, res) => {
         let { date } = req.query;
 
         if (!date) {
-            return res.status(400).json({ error: 'missing date parameter (format: YYYY-MM-DD, DD/MM, or DD/MM/YYYY)' });
+            return res
+                .status(400)
+                .json({
+                    error: 'missing date parameter (format: YYYY-MM-DD, DD/MM, or DD/MM/YYYY)',
+                });
         }
         // Normalise the incoming date into the prefix stored in MongoDB.
         // Top score documents currently use "DD/MM/YYYY HH:mm:ss".
@@ -227,7 +240,9 @@ app.get('/users/:username/top-history', async (req, res) => {
 // scraper trigger.
 
 function getFriendSnapshotCollectionName(accountType) {
-    return accountType === 'main' ? 'friend_rating_daily_snapshots_main' : 'friend_rating_daily_snapshots';
+    return accountType === 'main'
+        ? 'friend_rating_daily_snapshots_main'
+        : 'friend_rating_daily_snapshots';
 }
 
 app.get('/api/friends-leaderboard', async (req, res) => {
@@ -238,14 +253,19 @@ app.get('/api/friends-leaderboard', async (req, res) => {
 
         const latest = await collection.findOne({}, { sort: { snapshotDate: -1 } });
         if (!latest) {
-            return res.status(404).json({ success: false, error: 'No friend rating snapshot found' });
+            return res
+                .status(404)
+                .json({ success: false, error: 'No friend rating snapshot found' });
         }
 
         const friends = (Array.isArray(latest.friends) ? latest.friends : [])
             .map((f) => ({
                 friendIdx: f.friendIdx,
                 name: f.name,
-                rating: f.rating != null ? parseRatingToNumber(f.rating) : parseRatingToNumber(f.ratingText),
+                rating:
+                    f.rating != null
+                        ? parseRatingToNumber(f.rating)
+                        : parseRatingToNumber(f.ratingText),
             }))
             .filter((f) => f.friendIdx && f.rating != null)
             .sort((a, b) => b.rating - a.rating)
@@ -287,7 +307,7 @@ const SEGA_CACHE_TTL = 3600000; // 1 hour in ms
 
 async function getSegaSongs() {
     const now = Date.now();
-    if (segaSongsCache && (now - segaSongsCacheTime) < SEGA_CACHE_TTL) {
+    if (segaSongsCache && now - segaSongsCacheTime < SEGA_CACHE_TTL) {
         return segaSongsCache;
     }
     try {
@@ -309,18 +329,18 @@ app.get('/song-image', async (req, res) => {
     try {
         const title = req.query.title;
         if (!title) return res.status(400).json({ error: 'missing title' });
-        
+
         const songs = await getSegaSongs();
         if (!songs || songs.length === 0) {
             return res.status(503).json({ error: 'SEGA data unavailable' });
         }
-        
+
         // Find song by title (case-insensitive)
-        const song = songs.find(s => s.title && s.title.toLowerCase() === title.toLowerCase());
+        const song = songs.find((s) => s.title && s.title.toLowerCase() === title.toLowerCase());
         if (!song || !song.image_url) {
             return res.status(404).json({ error: 'song not found in SEGA database' });
         }
-        
+
         const imageUrl = `https://maimaidx.jp/maimai-mobile/img/Music/${song.image_url}`;
         res.json({ image: imageUrl });
     } catch (err) {
@@ -382,7 +402,7 @@ app.get('/song-image-data', async (req, res) => {
             return res.status(503).json({ error: 'SEGA data unavailable' });
         }
 
-        const song = songs.find(s => s.title && s.title.toLowerCase() === title.toLowerCase());
+        const song = songs.find((s) => s.title && s.title.toLowerCase() === title.toLowerCase());
         if (!song || !song.image_url) {
             return res.status(404).json({ error: 'song not found in SEGA database' });
         }

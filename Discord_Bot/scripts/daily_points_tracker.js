@@ -23,7 +23,10 @@ async function getDailyPointsGains(targetDate = null) {
 
     let dateToCheck = targetDate;
     if (!dateToCheck) {
-        const newest = await collection.findOne({}, { sort: { scrapedAt: -1 }, projection: { snapshotDate: 1 } });
+        const newest = await collection.findOne(
+            {},
+            { sort: { scrapedAt: -1 }, projection: { snapshotDate: 1 } }
+        );
         if (!newest) {
             console.log(`[${LABEL}] no circle ranking snapshots stored yet`);
             return null;
@@ -33,7 +36,10 @@ async function getDailyPointsGains(targetDate = null) {
 
     console.log(`[${LABEL}] analyzing gains for ${dateToCheck}`);
 
-    const daySnapshots = await collection.find({ snapshotDate: dateToCheck }).sort({ scrapedAt: 1 }).toArray();
+    const daySnapshots = await collection
+        .find({ snapshotDate: dateToCheck })
+        .sort({ scrapedAt: 1 })
+        .toArray();
 
     let firstSnapshot;
     let lastSnapshot;
@@ -52,12 +58,16 @@ async function getDailyPointsGains(targetDate = null) {
             .limit(1)
             .toArray();
         if (!previous) {
-            console.log(`[${LABEL}] only one snapshot for ${dateToCheck} and no prior day to compare`);
+            console.log(
+                `[${LABEL}] only one snapshot for ${dateToCheck} and no prior day to compare`
+            );
             return null;
         }
         firstSnapshot = previous;
         totalSnapshots = 2;
-        console.log(`[${LABEL}] comparing prior day ${firstSnapshot.snapshotDate} → ${dateToCheck}`);
+        console.log(
+            `[${LABEL}] comparing prior day ${firstSnapshot.snapshotDate} → ${dateToCheck}`
+        );
     } else {
         console.log(`[${LABEL}] no snapshots for ${dateToCheck}`);
         return null;
@@ -153,7 +163,8 @@ function buildDailyPointsEmbed(data) {
         `**➖ No Change:** ${noChange} teams`,
     ];
 
-    if (droppedOut.length > 0) lines.push(`**👻 Dropped out of top 100:** ${droppedOut.length} teams`);
+    if (droppedOut.length > 0)
+        lines.push(`**👻 Dropped out of top 100:** ${droppedOut.length} teams`);
     if (decreases.length > 0) lines.push(`**⚠️ Unusual Decreases:** ${decreases.length} teams`);
     lines.push('');
 
@@ -174,7 +185,9 @@ function buildDailyPointsEmbed(data) {
         lines.push('**⚠️ UNUSUAL POINT DECREASES** (may indicate a data issue)');
         decreases.slice(0, 5).forEach((team, index) => {
             const rank = String(index + 1).padStart(2, '0');
-            lines.push(`\`${rank}.\` **${team.groupName}** — ${team.pointsGain.toLocaleString()} PT`);
+            lines.push(
+                `\`${rank}.\` **${team.groupName}** — ${team.pointsGain.toLocaleString()} PT`
+            );
         });
         lines.push('');
     }
@@ -183,14 +196,19 @@ function buildDailyPointsEmbed(data) {
         lines.push('**👻 DROPPED OUT OF TOP 100**');
         droppedOut.slice(0, 5).forEach((team, index) => {
             const rank = String(index + 1).padStart(2, '0');
-            lines.push(`\`${rank}.\` **${team.groupName}** — was ${team.startPoints.toLocaleString()} PT`);
+            lines.push(
+                `\`${rank}.\` **${team.groupName}** — was ${team.startPoints.toLocaleString()} PT`
+            );
         });
     }
 
-    const footer = { text: `Generated: ${new Date().toLocaleString()} • Period: ${totalSnapshots} updates` };
+    const footer = {
+        text: `Generated: ${new Date().toLocaleString()} • Period: ${totalSnapshots} updates`,
+    };
 
     return chunkLines(lines, 4000).map((desc, idx) => ({
-        title: idx === 0 ? '📈 Daily Points Gains Report' : `Daily Points Report (cont. ${idx + 1})`,
+        title:
+            idx === 0 ? '📈 Daily Points Gains Report' : `Daily Points Report (cont. ${idx + 1})`,
         description: desc,
         color: 0x00ff00,
         footer,

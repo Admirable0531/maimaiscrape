@@ -18,7 +18,9 @@ const RETENTION_DAYS = 7;
  */
 async function isMaintenancePage(page) {
     const result = await page.evaluate(() => {
-        const bodyText = (document.body && document.body.innerText ? document.body.innerText : '').toLowerCase();
+        const bodyText = (
+            document.body && document.body.innerText ? document.body.innerText : ''
+        ).toLowerCase();
         return {
             hasRankingBlock: !!document.querySelector('.ranking_top_block, .ranking_block'),
             mentionsMaintenance:
@@ -32,7 +34,10 @@ async function isMaintenancePage(page) {
         !result.hasRankingBlock && (result.mentionsMaintenance || title.includes('maintenance'));
 
     if (isMaintenance) {
-        console.log(`[${LABEL}][maintenance] detected`, JSON.stringify({ ...result, title, url: page.url() }));
+        console.log(
+            `[${LABEL}][maintenance] detected`,
+            JSON.stringify({ ...result, title, url: page.url() })
+        );
     }
     return isMaintenance;
 }
@@ -130,7 +135,9 @@ async function getPreviousCircleRankings() {
 async function isFirstUpdateOfDay() {
     try {
         const db = await getDb();
-        const count = await db.collection(COLLECTION).countDocuments({ snapshotDate: getCalendarDayUTC() });
+        const count = await db
+            .collection(COLLECTION)
+            .countDocuments({ snapshotDate: getCalendarDayUTC() });
         return count === 0;
     } catch (err) {
         console.log(`[${LABEL}][daily] could not check today's updates:`, err.message);
@@ -160,7 +167,9 @@ async function saveCircleRankingSnapshot(rankings) {
             timestamp: now.getTime(),
         });
 
-        console.log(`[${LABEL}][save] saved ${rankings.length} rankings for ${getCalendarDayUTC(now)}`);
+        console.log(
+            `[${LABEL}][save] saved ${rankings.length} rankings for ${getCalendarDayUTC(now)}`
+        );
         return true;
     } catch (err) {
         console.error(`[${LABEL}][save] error saving to MongoDB:`, err.message);
@@ -202,7 +211,8 @@ function buildCircleRankingEmbeds(rankings, previousRankings = null, isFirstOfDa
     }
 
     const sorted = sortRankings(rankings);
-    const previous = previousRankings && previousRankings.length > 0 ? toRankMap(previousRankings) : null;
+    const previous =
+        previousRankings && previousRankings.length > 0 ? toRankMap(previousRankings) : null;
 
     const lines = sorted.map((r, index) => {
         const currentRank = index + 1;
@@ -246,7 +256,9 @@ function buildCircleRankingEmbeds(rankings, previousRankings = null, isFirstOfDa
         title: idx === 0 ? 'Circle Rankings - Top 100' : `Circle Rankings (cont. ${idx + 1})`,
         description: idx === 0 ? `${divider}\n${dividerText}\n${divider}\n\n${desc}` : desc,
         color: isFirstOfDay ? 0xffd700 : 0x7289da,
-        footer: { text: `Total: ${sorted.length} circles • Updated: ${now.toLocaleString()}${comparisonText}` },
+        footer: {
+            text: `Total: ${sorted.length} circles • Updated: ${now.toLocaleString()}${comparisonText}`,
+        },
     }));
 }
 
@@ -274,7 +286,9 @@ async function run(opts = {}) {
         return { ok: false, error: 'missing credentials', rankingsCount: 0 };
     }
 
-    console.log(`[${LABEL}] starting circle ranking scrape (webhook: ${webhookMode}, save: ${doSave})`);
+    console.log(
+        `[${LABEL}] starting circle ranking scrape (webhook: ${webhookMode}, save: ${doSave})`
+    );
 
     try {
         const result = await withMaimaiSession({
@@ -292,7 +306,8 @@ async function run(opts = {}) {
                     [
                         {
                             title: 'Circle Rankings - Maintenance',
-                            description: 'maimai is currently under maintenance. Scraping will resume afterwards.',
+                            description:
+                                'maimai is currently under maintenance. Scraping will resume afterwards.',
                             color: 0xffa500,
                             footer: { text: `Checked at: ${new Date().toLocaleString()}` },
                         },
@@ -311,7 +326,8 @@ async function run(opts = {}) {
                     [
                         {
                             title: 'Circle Rankings - Error',
-                            description: 'Failed to scrape circle rankings (login issue or site change).',
+                            description:
+                                'Failed to scrape circle rankings (login issue or site change).',
                             color: 0xff0000,
                             footer: { text: `Error at: ${new Date().toLocaleString()}` },
                         },
@@ -342,7 +358,9 @@ async function run(opts = {}) {
 
         let sentWebhook = false;
         if (shouldSend) {
-            console.log(`[${LABEL}][webhook] posting (mode: ${webhookMode}, changes: ${hasChanges})`);
+            console.log(
+                `[${LABEL}][webhook] posting (mode: ${webhookMode}, changes: ${hasChanges})`
+            );
             sentWebhook = await sendToWebhook(
                 webhookUrl,
                 buildCircleRankingEmbeds(rankings, previousRankings, isFirstOfDay),

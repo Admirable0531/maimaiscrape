@@ -33,14 +33,23 @@ function fetchBinary(url, redirectsLeft = 3) {
         transport
             .get(parsed, options, (res) => {
                 const { statusCode = 0, headers } = res;
-                if (statusCode >= 300 && statusCode < 400 && headers.location && redirectsLeft > 0) {
+                if (
+                    statusCode >= 300 &&
+                    statusCode < 400 &&
+                    headers.location &&
+                    redirectsLeft > 0
+                ) {
                     res.resume();
-                    resolve(fetchBinary(new URL(headers.location, parsed).toString(), redirectsLeft - 1));
+                    resolve(
+                        fetchBinary(new URL(headers.location, parsed).toString(), redirectsLeft - 1)
+                    );
                     return;
                 }
                 if (statusCode < 200 || statusCode >= 300) {
                     res.resume();
-                    reject(Object.assign(new Error(`upstream returned ${statusCode}`), { statusCode }));
+                    reject(
+                        Object.assign(new Error(`upstream returned ${statusCode}`), { statusCode })
+                    );
                     return;
                 }
                 const chunks = [];

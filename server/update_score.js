@@ -82,7 +82,8 @@ async function loadUserIds(db) {
             else if (friendIdx && /^\d+$/.test(friendIdx)) id = friendIdx;
             else if (userVal && /^\d+$/.test(userVal)) id = userVal;
             else if (userVal && config.idxMap?.[userVal]) id = config.idxMap[userVal];
-            else if (userVal && getFriendIdxFromOldName(userVal)) id = getFriendIdxFromOldName(userVal);
+            else if (userVal && getFriendIdxFromOldName(userVal))
+                id = getFriendIdxFromOldName(userVal);
 
             if (id && !seen.has(id)) {
                 seen.add(id);
@@ -120,7 +121,9 @@ async function loadSnapshotPair(db, collectionName) {
     const currentDay = getCalendarDay(current._id);
     const previous = documents.slice(1).find((doc) => getCalendarDay(doc._id) !== currentDay);
     if (!previous) {
-        console.error(`[update_score] ${collectionName}: no snapshot from an earlier day to compare`);
+        console.error(
+            `[update_score] ${collectionName}: no snapshot from an earlier day to compare`
+        );
         return null;
     }
     return { current, previous };
@@ -128,12 +131,18 @@ async function loadSnapshotPair(db, collectionName) {
 
 async function getUserInfo(db, userId) {
     try {
-        const doc = await db.collection('user_info').findOne({ user: String(userId) }, { sort: { _id: -1 } });
+        const doc = await db
+            .collection('user_info')
+            .findOne({ user: String(userId) }, { sort: { _id: -1 } });
         if (!doc) {
             console.error('[update_score] no user_info for', userId);
             return { imgSrc: null, name: String(userId), rating: '' };
         }
-        return { imgSrc: doc.img_src ?? null, name: doc.name ?? String(userId), rating: doc.rating ?? '' };
+        return {
+            imgSrc: doc.img_src ?? null,
+            name: doc.name ?? String(userId),
+            rating: doc.rating ?? '',
+        };
     } catch (err) {
         console.error('[update_score] getUserInfo failed:', err.message);
         return { imgSrc: null, name: String(userId), rating: '' };
@@ -180,13 +189,20 @@ async function buildUserEmbeds(db, userId) {
     const ratingDiffStr = `(${ratingDiff >= 0 ? '+' : '-'}${Math.abs(ratingDiff)}rt)`;
 
     const lines = [
-        ...findImprovedEntries(current.new, previous.new).map((song) => formatScoreLine(song, 'NEW')),
-        ...findImprovedEntries(current.old, previous.old).map((song) => formatScoreLine(song, 'OLD')),
+        ...findImprovedEntries(current.new, previous.new).map((song) =>
+            formatScoreLine(song, 'NEW')
+        ),
+        ...findImprovedEntries(current.old, previous.old).map((song) =>
+            formatScoreLine(song, 'OLD')
+        ),
     ];
 
     const { imgSrc, name, rating } = await getUserInfo(db, userId);
     const attachment = await fetchAvatarAttachment(imgSrc);
-    const author = { name: `${name} ${rating}rt ${ratingDiffStr}`, iconURL: attachment ? `attachment://${attachment.name}` : undefined };
+    const author = {
+        name: `${name} ${rating}rt ${ratingDiffStr}`,
+        iconURL: attachment ? `attachment://${attachment.name}` : undefined,
+    };
 
     if (lines.length === 0) {
         // Always show Ryan so the daily post is never completely empty.
@@ -260,7 +276,9 @@ async function runStandalone() {
             try {
                 if (payload && Array.isArray(payload.embeds)) {
                     outputs.push({
-                        embeds: payload.embeds.map((e) => (typeof e.toJSON === 'function' ? e.toJSON() : e)),
+                        embeds: payload.embeds.map((e) =>
+                            typeof e.toJSON === 'function' ? e.toJSON() : e
+                        ),
                     });
                 } else {
                     outputs.push({

@@ -9,7 +9,7 @@ function showDividerExamples() {
     // 30-minute update divider
     const regularDivider = '───────────────────────────────────────────────────────────────';
     const regularText = '⏰ **30-MINUTE UPDATE** ⏰';
-    
+
     console.log('📋 Regular 30-minute update:');
     console.log(regularDivider);
     console.log(regularText);
@@ -21,8 +21,9 @@ function showDividerExamples() {
 
     // Daily update divider
     const dailyDivider = '═══════════════════════════════════════════════════════════════';
-    const dailyText = '🌅 **DAILY CIRCLE RANKINGS UPDATE** 🌅\n📊 **Complete Top 100 Circle Rankings** 📊';
-    
+    const dailyText =
+        '🌅 **DAILY CIRCLE RANKINGS UPDATE** 🌅\n📊 **Complete Top 100 Circle Rankings** 📊';
+
     console.log('📋 Daily update (first of the day):');
     console.log(dailyDivider);
     console.log(dailyText);

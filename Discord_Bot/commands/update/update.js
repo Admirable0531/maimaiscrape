@@ -19,7 +19,9 @@ module.exports = {
             const body = await resp.json().catch(() => ({}));
 
             if (resp.status === 409) {
-                await interaction.editReply('An update is already running — try again once it finishes.');
+                await interaction.editReply(
+                    'An update is already running — try again once it finishes.'
+                );
                 return;
             }
             if (!resp.ok || !body.success) {
@@ -32,7 +34,9 @@ module.exports = {
             const messages = body.messages || [];
             for (const message of messages) {
                 if (message.embeds?.length) {
-                    await interaction.channel.send({ embeds: message.embeds.map((e) => new EmbedBuilder(e)) });
+                    await interaction.channel.send({
+                        embeds: message.embeds.map((e) => new EmbedBuilder(e)),
+                    });
                 } else if (message.content) {
                     await interaction.channel.send(message.content);
                 }
@@ -40,7 +44,8 @@ module.exports = {
             await interaction.editReply(`Update completed — posted ${messages.length} message(s).`);
         } catch (err) {
             console.error('Error triggering update:', err);
-            const reason = err.name === 'TimeoutError' ? 'it timed out' : 'check the API is running';
+            const reason =
+                err.name === 'TimeoutError' ? 'it timed out' : 'check the API is running';
             await interaction.editReply(`Failed to trigger update (${reason}).`);
         }
     },

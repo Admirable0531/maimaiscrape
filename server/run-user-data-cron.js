@@ -15,18 +15,20 @@ const [hour, minute] = RUN_AT.split(':').map((s) => s.padStart(2, '0'));
 const cronExpr = `${minute} ${hour} * * *`;
 
 if (cronEnabled) {
-  console.log(`[cron] User-data scraper scheduled daily at ${RUN_AT} (cron: ${cronExpr})`);
-  cron.schedule(cronExpr, async () => {
-    console.log('[cron] Running scheduled user-data update');
-    try {
-      const ok = await updateUserData();
-      console.log('[cron] User-data update finished:', ok ? 'success' : 'no success');
-    } catch (err) {
-      console.error('[cron] User-data update error:', err);
-    }
-  });
+    console.log(`[cron] User-data scraper scheduled daily at ${RUN_AT} (cron: ${cronExpr})`);
+    cron.schedule(cronExpr, async () => {
+        console.log('[cron] Running scheduled user-data update');
+        try {
+            const ok = await updateUserData();
+            console.log('[cron] User-data update finished:', ok ? 'success' : 'no success');
+        } catch (err) {
+            console.error('[cron] User-data update error:', err);
+        }
+    });
 } else {
-  console.log('[cron] SCRAPER_CRON_ENABLED=false — no schedule; use Discord /scraper or npm run run-scraper for manual run.');
+    console.log(
+        '[cron] SCRAPER_CRON_ENABLED=false — no schedule; use Discord /scraper or npm run run-scraper for manual run.'
+    );
 }
 
 // Keep process alive

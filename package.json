@@ -15,7 +15,9 @@
     "friends": "node Discord_Bot/scripts/friends_webhook.js",
     "circle": "node Discord_Bot/scripts/circle_ranking_scraper.js",
     "daily-points": "node Discord_Bot/scripts/daily_points_tracker.js",
-    "migrate": "node server/scripts/migrate-collections-to-friend-idx.js"
+    "migrate": "node server/scripts/migrate-collections-to-friend-idx.js",
+    "lint": "eslint Discord_Bot/ server/ scripts/",
+    "format": "prettier --write \"Discord_Bot/**/*.js\" \"server/**/*.js\" \"scripts/**/*.js\""
   },
   "dependencies": {
     "discord.js": "^14.14.1",
@@ -26,5 +28,10 @@
     "puppeteer": "^23.11.1",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.6"
   }
 }
