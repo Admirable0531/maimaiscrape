@@ -115,13 +115,17 @@ services:
   # via the host's LAN IP now instead of Docker-internal DNS, since it's no
   # longer on this compose network.
 
+  # Production build (vite build + nginx) rather than the dev server, since
+  # this is meant to be reachable from the public internet via Cloudflare
+  # Tunnel — a Vite dev server isn't hardened for that. nginx.conf also
+  # restricts the /api/ proxy to GET only, so the API's unauthenticated
+  # scrape-trigger POST endpoints stay unreachable from here.
   web:
     build:
-      context: .
-      dockerfile: web/Dockerfile
+      context: ./web
     container_name: maimai_web
     ports:
-      - "5173:5173"
+      - "5173:80"
     environment:
       - TZ=Asia/Kuala_Lumpur
     depends_on:

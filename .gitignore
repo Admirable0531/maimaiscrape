@@ -2,6 +2,7 @@ node_modules/
 .env
 *.log
 nohup.out
+dist/
 
 # Debug screenshots from maimai_session.js's SCREENSHOT_DEBUG (see discord-bot/lib/maimai_session.js)
 screenshots/
