@@ -1,4 +1,4 @@
-name: Deploy to Raspberry Pi
+name: Deploy to OptiPlex
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    # Runs directly on the Pi itself (registered as a self-hosted runner —
+    # Runs directly on the host itself (registered as a self-hosted runner —
     # see README for setup) instead of GitHub's cloud SSHing into the home
     # network. The old approach depended on SSH_HOST/SSH_USER/SSH_KEY
     # secrets plus a router port-forward and/or DDNS staying correct — one
@@ -15,11 +15,13 @@ jobs:
     # has failed at the SSH step (~30s, connection-level, never even
     # reaching git pull). A self-hosted runner polls outward to GitHub
     # instead, so nothing needs to be reachable from the internet at all.
+    # Migrated off the Pi (192.168.0.25) to an OptiPlex (192.168.0.225) on
+    # 2026-08-09 — flat ~/ layout there instead of ~/Desktop/.
     runs-on: self-hosted
     steps:
       - name: Deploy
         run: |
-          cd /home/ryan/Desktop/maimaiscrape
+          cd /home/ryan/maimaiscrape
           git pull
           docker compose down
           docker compose up -d --build
