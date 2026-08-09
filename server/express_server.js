@@ -91,6 +91,10 @@ async function toDataUrl(url) {
 // Single shared MongoClient for the process (see discord-bot/lib/mongo.js)
 const getDatabase = getDb;
 
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
 // API endpoints for users and scores (username = 'ryan' or friendIdx as string: '0','1',...)
 app.get('/users', async (req, res) => {
     try {
