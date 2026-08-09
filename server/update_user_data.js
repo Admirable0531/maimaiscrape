@@ -624,7 +624,7 @@ async function updateUserData() {
                                 (async () => {
                                     for (let i = 0; i < 24; i++) {
                                         await delay(500);
-                                        const ids = await page.evaluate((excludeList) => {
+                                        const ids = await page.evaluate(() => {
                                             const links = Array.from(
                                                 document.querySelectorAll(
                                                     'a[target="friendRating"]'
@@ -641,10 +641,10 @@ async function updateUserData() {
                                                     }
                                                 })
                                                 .filter(Boolean);
-                                        }, page1IdList);
+                                        });
                                         if (
                                             ids.length > 0 &&
-                                            ids.some((id) => !excludeList.includes(id))
+                                            ids.some((id) => !page1IdList.includes(id))
                                         )
                                             return;
                                     }
