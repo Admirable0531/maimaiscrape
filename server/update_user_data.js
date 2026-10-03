@@ -529,7 +529,7 @@ async function updateUserData() {
                             );
                         }
                     }
-                    await db.collection('ryan_top').insertOne(ryan_top);
+                    await db.collection(getTopCollectionName('ryan')).insertOne(ryan_top);
                     console.log('[update] Done Ryan Score');
                     await targetPage.close();
                 } else {

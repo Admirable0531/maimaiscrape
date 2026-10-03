@@ -44,7 +44,7 @@ async function main() {
     const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/';
     const client = new MongoClient(uri);
     await client.connect();
-    const db = client.db('mydatabase');
+    const db = client.db(process.env.DB_NAME || 'mydatabase');
     const cursor = db.collection('user_info').find({ user: 'ryan' }).sort({ _id: 1 });
     const rows = [];
     for await (const doc of cursor) {

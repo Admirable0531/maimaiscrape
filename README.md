@@ -45,7 +45,7 @@ Set `DAILY_PIPELINE_ENABLED=false` to disable the schedule and drive everything 
 |---------|---------|
 | `/daily` | Run the daily pipeline now (`all`, `scrape` only, or `post` only) |
 | `/update` | Post the score diff using data already in Mongo |
-| `/scraper` | Run the top-score scrape only |
+| `/scraper` | Scrape top scores + profiles now (the daily `scrape-top-scores` step on its own, no Discord posts) |
 | `/updatefriendsdata` | Scrape and save today's friend rating snapshot |
 | `/friendsrating` | Post the friend leaderboard with comparison arrows |
 | `/latestfriendsleaderboard` | Post the newest friend leaderboard, no arrows |

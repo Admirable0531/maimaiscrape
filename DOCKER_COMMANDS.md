@@ -95,14 +95,34 @@ HEADLESS=false npm run scraper
 Ad-hoc manual verification scripts (not part of any automated suite) live in
 `scripts/debug/` — e.g. `node scripts/debug/test_mongodb_connection.js`.
 
-## Migration (old name collections → friendIdx)
+## Database audit (read-only)
 
-Run once to copy `yuchen_top` etc. into `friend_6020500221031_top` and update
-`user_info`:
+Prints what is actually in Mongo: which top-score collections exist under the
+old name-based scheme versus the `friend_<idx>_top` one, whether `user_info`
+still holds old nickname identities, and how fresh each snapshot collection
+is. Writes nothing, so it is safe against production at any time — run it
+before and after the migration below.
 
 ```bash
+docker compose exec api node server/scripts/db-audit.js
+```
+
+## Migration (old name collections → friendIdx)
+
+Copies `yuchen_top` etc. into `friend_6020500221031_top` and rewrites the
+matching `user_info` identities. Idempotent — documents already present in the
+target are skipped, so re-running reports "already there" rather than
+duplicating score history:
+
+```bash
+# see what it would do, without writing
+docker compose exec api node server/scripts/migrate-collections-to-friend-idx.js --dry-run
+
 docker compose exec api node server/scripts/migrate-collections-to-friend-idx.js
 ```
+
+The old `<name>_top` collections are left in place; drop them by hand once
+`db-audit.js` shows the new ones holding the same history.
 
 ## Shells
 
@@ -120,5 +140,6 @@ docker compose exec mongodb mongo mydatabase
 | Bot logs | `docker compose logs -f bot` |
 | Re-register commands | `docker compose exec bot node discord-bot/deploy-commands.js` |
 | Manual scraper run | `docker compose run --rm scraper node server/update_user_data.js` |
+| DB audit (read-only) | `docker compose exec api node server/scripts/db-audit.js` |
 | Migration | `docker compose exec api node server/scripts/migrate-collections-to-friend-idx.js` |
 | Mongo shell | `docker compose exec mongodb mongo mydatabase` |

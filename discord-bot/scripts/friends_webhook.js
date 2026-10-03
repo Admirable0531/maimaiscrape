@@ -221,10 +221,14 @@ async function run(opts = {}) {
     const sessionLabel = `${LABEL}-${accountType}`;
 
     try {
+        // No `fallback` on purpose: a failed login should surface its reason
+        // (see maimai_session.js's MaimaiSessionError), not come back as an
+        // empty array that reads identically to "logged in fine, zero
+        // friends". The catch below turns it into {ok:false, error} so the
+        // daily pipeline's summary names the real cause.
         const friends = await withMaimaiSession({
             credentials,
             label: sessionLabel,
-            fallback: [],
             task: async (page, _browser, { shot }) => {
                 await page.goto(FRIEND_LIST_URL, { waitUntil: 'networkidle2', timeout: 60000 });
                 await shot(page, '07_friend_page');
@@ -235,7 +239,14 @@ async function run(opts = {}) {
         console.log(`[${sessionLabel}] collected ${friends.length} entries for ${account.label}`);
 
         if (friends.length === 0) {
-            return { ok: false, error: 'no friends scraped', friendsCount: 0 };
+            // Reached only when the session itself succeeded — the friend
+            // list page loaded and genuinely parsed to nothing, which points
+            // at a layout change in scrapeAllFriends rather than at login.
+            return {
+                ok: false,
+                error: 'logged in but the friend list parsed to 0 entries (page layout changed?)',
+                friendsCount: 0,
+            };
         }
         if (doSave) {
             await saveFriendRatingsSnapshot(friends, accountType);

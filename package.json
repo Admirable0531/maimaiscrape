@@ -16,6 +16,7 @@
     "circle": "node discord-bot/scripts/circle_ranking_scraper.js",
     "daily-points": "node discord-bot/scripts/daily_points_tracker.js",
     "migrate": "node server/scripts/migrate-collections-to-friend-idx.js",
+    "db-audit": "node server/scripts/db-audit.js",
     "lint": "eslint discord-bot/ server/ scripts/",
     "format": "prettier --write \"discord-bot/**/*.js\" \"server/**/*.js\" \"scripts/**/*.js\""
   },
