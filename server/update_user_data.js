@@ -125,13 +125,32 @@ async function isErrorPage(page) {
 const TOP_RECORD_TABLE_TIMEOUT = parseInt(process.env.TOP_RECORD_TABLE_TIMEOUT || '120000', 10);
 const TOP_RECORD_POLL_MS = parseInt(process.env.TOP_RECORD_POLL_MS || '2000', 10);
 
-/** Wait for SEGA top-record page: poll every few seconds; exit as soon as table appears (no full timeout once loaded). */
+/**
+ * Wait for the mai-tools top-record page to be not just present but FINISHED.
+ *
+ * This used to return the moment `.topRecordTable.songRecordTable` existed,
+ * while still computing the "Loading <difficulty> scores" state purely to log
+ * it. But mai-tools renders that table as soon as it has anything to show and
+ * keeps filling it in as each difficulty's scores arrive, so returning on the
+ * element's existence reads a half-loaded table.
+ *
+ * Confirmed live on 2026-10-03: SEGA's own home page reported 16419 while the
+ * breakdown scraped minutes later summed to 16407, and the stored B50 came out
+ * byte-identical to the previous night — the new plays simply hadn't loaded
+ * yet. Three nights running had already recorded the same frozen 16407. The
+ * slower the night (that run took 301s), the likelier the race is lost.
+ *
+ * So the wait now requires the table AND no outstanding loading text. The
+ * deadline is still a backstop, but expiring now says so instead of quietly
+ * handing back partial data.
+ */
 async function waitForTopRecordPageReady(page) {
     const tableSelector = '.topRecordTable.songRecordTable';
     const loadingPattern =
         'Loading\\s+(?:Re:?Master|Basic|Master|Expert|Advanced|recent)\\s+scores';
     const deadline = Date.now() + TOP_RECORD_TABLE_TIMEOUT;
     let lastLoading = '';
+    let sawTable = false;
     while (Date.now() < deadline) {
         const { table, loading } = await page.evaluate(
             (sel, pattern) => {
@@ -146,12 +165,21 @@ async function waitForTopRecordPageReady(page) {
             tableSelector,
             loadingPattern
         );
-        if (table) return;
+        sawTable = sawTable || table;
+        if (table && !loading) return;
         if (loading && loading !== lastLoading) {
             lastLoading = loading;
             console.log('[update] top-record:', loading);
         }
         await delay(TOP_RECORD_POLL_MS);
+    }
+    if (sawTable) {
+        console.log(
+            `[update] WARNING: top-record page still loading after ${Math.round(
+                TOP_RECORD_TABLE_TIMEOUT / 1000
+            )}s ("${lastLoading}") — the breakdown read next may be incomplete`
+        );
+        return;
     }
     await page.waitForSelector(tableSelector, { timeout: 1000 });
 }
@@ -284,6 +312,10 @@ async function getRyanInfo(page, db, formattedDate) {
     };
     await db.collection('user_info').insertOne(ryan_user_data);
     console.log('[get_ryan_info] inserted ryan user_info');
+    // Returned so the caller can check the mai-tools breakdown against it.
+    // This is SEGA's own displayed rating, read straight off the home page,
+    // which makes it the authority the computed B50 total has to agree with.
+    return parseInt(String(user_rating).replace(/[^0-9]/g, ''), 10) || null;
 }
 
 /** Insert user_info for friends; each entry has friendIdx (from link) and name/img_src/rating from the same block. */
@@ -442,8 +474,9 @@ async function updateUserData() {
             ).padStart(2, '0')}/${now.getFullYear()}`;
 
             // get ryan info
+            let segaRating = null;
             try {
-                await getRyanInfo(page, db, formattedDate);
+                segaRating = await getRyanInfo(page, db, formattedDate);
             } catch (e) {
                 console.log('[update] get_ryan_info failed', e);
             }
@@ -479,6 +512,23 @@ async function updateUserData() {
                 if (clicked) {
                     const targetPage = await newPagePromise;
                     const ryan_top = await getTopScore(targetPage);
+                    // mai-tools computes the B50 total itself, so it can
+                    // disagree with the rating SEGA actually displays — and
+                    // when it does, it's because the breakdown it summed is
+                    // incomplete, not because SEGA is wrong. Record SEGA's
+                    // number alongside and say so loudly, so a frozen
+                    // breakdown is visible in the log and in the document
+                    // rather than silently becoming "your rating".
+                    if (segaRating !== null) {
+                        ryan_top.sega_rating = segaRating;
+                        if (ryan_top.rating !== null && ryan_top.rating !== segaRating) {
+                            ryan_top.rating_mismatch = true;
+                            console.log(
+                                `[update] WARNING: computed B50 total ${ryan_top.rating} != SEGA's displayed rating ${segaRating} ` +
+                                    `(off by ${segaRating - ryan_top.rating}) — the breakdown is probably missing a recent play`
+                            );
+                        }
+                    }
                     await db.collection('ryan_top').insertOne(ryan_top);
                     console.log('[update] Done Ryan Score');
                     await targetPage.close();
