@@ -240,6 +240,15 @@ async function login(page, credentials, label, shot, attempt) {
     }
 }
 
+/** Raised when every login attempt failed, carrying why each one did. */
+class MaimaiSessionError extends Error {
+    constructor(label, reasons) {
+        super(`${label}: all ${reasons.length} login attempt(s) failed — ${reasons.join('; ')}`);
+        this.name = 'MaimaiSessionError';
+        this.reasons = reasons;
+    }
+}
+
 /**
  * Runs `task(page, browser)` inside a logged-in maimai session.
  *
@@ -248,15 +257,25 @@ async function login(page, credentials, label, shot, attempt) {
  * always closed, including on throw — the previous copies could leak one on
  * some paths.
  *
- * Returns whatever `task` returns, or `fallback` if every attempt failed.
+ * Returns whatever `task` returns. When every attempt fails: throws
+ * MaimaiSessionError unless the caller passed an explicit `fallback`, in
+ * which case that value is returned instead.
+ *
+ * Why the throw is the default: every failure here used to be swallowed into
+ * a console.log and the caller got a bare fallback, so a failed login reached
+ * Discord as "no friends scraped" with no cause attached — a wrong password,
+ * a missing Chromium and a SEGA error page were indistinguishable without
+ * going to read container logs. The reasons travel with the error now.
  */
-async function withMaimaiSession({ credentials, label, task, fallback = null }) {
+async function withMaimaiSession({ credentials, label, task, fallback }) {
     const shot = makeScreenshotter(label);
     const executablePath = resolveExecutablePath(label);
     const envUa = (process.env.USER_AGENT || '').trim();
     const userAgents = [envUa || FALLBACK_UA, ALT_UA];
 
     if (!HEADLESS) console.log(`[${label}] running with a visible browser (HEADLESS=false)`);
+
+    const reasons = [];
 
     for (let attempt = 1; attempt <= userAgents.length; attempt++) {
         const ua = userAgents[attempt - 1];
@@ -286,12 +305,17 @@ async function withMaimaiSession({ credentials, label, task, fallback = null }) 
                 console.log(
                     `[${label}][attempt ${attempt}] SEGA returned an ERROR page after login; retrying`
                 );
+                reasons.push(
+                    `attempt ${attempt} (${ua === ALT_UA ? 'alt UA' : 'primary UA'}): SEGA served its ERROR page after login ` +
+                        `(usually a rejected Sega ID/password, or the account being signed in elsewhere)`
+                );
                 continue;
             }
 
             return await task(page, browser, { shot, label });
         } catch (err) {
             console.log(`[${label}] unhandled exception during attempt ${attempt}:`, err.message);
+            reasons.push(`attempt ${attempt}: ${err.message}`);
         } finally {
             if (browser) {
                 await browser
@@ -301,12 +325,14 @@ async function withMaimaiSession({ credentials, label, task, fallback = null }) 
         }
     }
 
-    console.log(`[${label}] all ${userAgents.length} attempts failed`);
+    console.log(`[${label}] all ${userAgents.length} attempts failed: ${reasons.join('; ')}`);
+    if (fallback === undefined) throw new MaimaiSessionError(label, reasons);
     return fallback;
 }
 
 module.exports = {
     withMaimaiSession,
+    MaimaiSessionError,
     isErrorPage,
     clickVisibleAgreeCheckbox,
     makeScreenshotter,

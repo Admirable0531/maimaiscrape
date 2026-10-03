@@ -479,7 +479,7 @@ async function updateUserData() {
                 if (clicked) {
                     const targetPage = await newPagePromise;
                     const ryan_top = await getTopScore(targetPage);
-                    await db.collection('ryan_top').insertOne(ryan_top);
+                    await db.collection(getTopCollectionName('ryan')).insertOne(ryan_top);
                     console.log('[update] Done Ryan Score');
                     await targetPage.close();
                 } else {

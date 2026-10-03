@@ -7,7 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const { updateUserData } = require('./update_user_data');
 const updateScore = require('./update_score');
-const { getTopCollectionName } = require('./collectionNames');
+const { getTopCollectionName, getFriendIdxFromOldName } = require('./collectionNames');
 const { getDb, closeMongo } = require('../discord-bot/lib/mongo');
 
 const friendsWebhook = require('../discord-bot/scripts/friends_webhook');
@@ -91,6 +91,24 @@ async function toDataUrl(url) {
 // Single shared MongoClient for the process (see discord-bot/lib/mongo.js)
 const getDatabase = getDb;
 
+/**
+ * Accepts either identity scheme and answers with the current one.
+ *
+ * Score history predates friendIdx naming, so a deployment that hasn't run
+ * server/scripts/migrate-collections-to-friend-idx.js still has user_info
+ * docs whose `user` is a nickname ('yuchen'). /users hands those straight to
+ * callers, who hand them back here — and getTopCollectionName() returns null
+ * for a non-numeric id, so the request 404'd/400'd for exactly the friends
+ * whose data had not been migrated yet. update_score.js has resolved both
+ * schemes this way for a while; the HTTP layer now does too, so the API and
+ * the nightly report can't disagree about who exists.
+ */
+function resolveUserId(username) {
+    if (username === 'ryan') return 'ryan';
+    if (/^\d+$/.test(username)) return username;
+    return getFriendIdxFromOldName(username) || username;
+}
+
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
@@ -102,12 +120,18 @@ app.get('/users', async (req, res) => {
         const collection = db.collection('user_info');
         const users = await collection.find({}).sort({ _id: -1 }).toArray();
 
-        // Group by user (id = 'ryan' or friendIdx string) and keep latest entry per user
+        // Group by user (id = 'ryan' or friendIdx string) and keep latest entry
+        // per user. Ids are normalised through resolveUserId so a nickname
+        // left over from before the friendIdx migration is reported — and
+        // keyed — as the friendIdx every other endpoint expects, rather than
+        // being handed back as an id that /users/:id/top-score then rejects.
         const userMap = new Map();
         users.forEach((user) => {
-            const id = user.user != null ? String(user.user) : user.friendIdx;
-            if (id !== undefined && id !== null && !userMap.has(String(id))) {
-                userMap.set(String(id), { ...user, user: String(id) });
+            const raw = user.user != null ? String(user.user) : user.friendIdx;
+            if (raw === undefined || raw === null) return;
+            const id = resolveUserId(String(raw));
+            if (!userMap.has(id)) {
+                userMap.set(id, { ...user, user: id });
             }
         });
 
@@ -123,7 +147,7 @@ app.get('/users/:username/top-score', async (req, res) => {
         const { username } = req.params;
         // Validate before touching Mongo, so a bad id returns 400 rather than
         // failing later as a 500.
-        const id = username === 'ryan' ? 'ryan' : username; // friendIdx from link (e.g. 6020500221031)
+        const id = resolveUserId(username); // friendIdx from link (e.g. 6020500221031)
         const collectionName = getTopCollectionName(id);
         if (!collectionName) {
             return res.status(400).json({ success: false, error: 'invalid user id' });
@@ -155,11 +179,9 @@ app.get('/users/:username/scores-by-date', async (req, res) => {
         let { date } = req.query;
 
         if (!date) {
-            return res
-                .status(400)
-                .json({
-                    error: 'missing date parameter (format: YYYY-MM-DD, DD/MM, or DD/MM/YYYY)',
-                });
+            return res.status(400).json({
+                error: 'missing date parameter (format: YYYY-MM-DD, DD/MM, or DD/MM/YYYY)',
+            });
         }
         // Normalise the incoming date into the prefix stored in MongoDB.
         // Top score documents currently use "DD/MM/YYYY HH:mm:ss".
@@ -181,7 +203,7 @@ app.get('/users/:username/scores-by-date', async (req, res) => {
         }
         const escapedPrefix = searchPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-        const id = username === 'ryan' ? 'ryan' : username;
+        const id = resolveUserId(username);
         const collectionName = getTopCollectionName(id);
         if (!collectionName) {
             return res.status(400).json({ error: 'invalid user id' });
@@ -213,7 +235,7 @@ app.get('/users/:username/scores-by-date', async (req, res) => {
 app.get('/users/:username/top-history', async (req, res) => {
     try {
         const { username } = req.params;
-        const id = username === 'ryan' ? 'ryan' : username;
+        const id = resolveUserId(username);
         const collectionName = getTopCollectionName(id);
         if (!collectionName) {
             return res.status(400).json({ error: 'invalid user id' });

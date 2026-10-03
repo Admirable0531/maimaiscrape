@@ -1,6 +1,8 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
+const { NAME_TO_FRIEND_IDX } = require('../server/collectionNames');
+
 /**
  * Non-secret configuration only.
  *
@@ -56,16 +58,11 @@ module.exports = {
     // FRIEND_WEBHOOK_URL_FY) — it posts via the bot client to this channel id,
     // the same way dailyScoreChannelID does. Empty until set in .env.
     mainLeaderboardChannelID: env('MAIN_LEADERBOARD_CHANNEL_ID', ''),
-    checkConstant: ['klcc', 'marcus', 'yuan', 'keyang', 'yuchen', 'jerry', 'kok'],
-    idxMap: {
-        klcc: '4039890368767',
-        yuchen: '6020500221031',
-        marcus: '8071982688053',
-        kok: '8085423055111',
-        yuan: '8070962675681',
-        keyang: '8091021494559',
-        jerry: '6028368715803',
-    },
+    // Both derived from server/collectionNames.js's NAME_TO_FRIEND_IDX so a
+    // friend added there is immediately resolvable by /constant, instead of
+    // needing the same nickname -> friendIdx pair written out in two files.
+    checkConstant: Object.keys(NAME_TO_FRIEND_IDX),
+    idxMap: NAME_TO_FRIEND_IDX,
 
     // ---- secrets: environment only, no fallbacks ----
     MAIMAI_ACCOUNT_RATING_FY: process.env.MAIMAI_ACCOUNT_RATING_FY || '',
