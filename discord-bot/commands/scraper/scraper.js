@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
+const { longFetch } = require('../../lib/long_fetch');
 
 const EXPRESS_URL = process.env.EXPRESS_URL || 'http://api:3000';
 // A Discord interaction token is valid for 15 minutes, after which every
@@ -37,7 +38,7 @@ module.exports = {
         };
 
         try {
-            const resp = await fetch(`${EXPRESS_URL}/run-update-user-data`, {
+            const resp = await longFetch(`${EXPRESS_URL}/run-update-user-data`, {
                 method: 'POST',
                 signal: AbortSignal.timeout(INTERACTION_BUDGET_MS),
             });

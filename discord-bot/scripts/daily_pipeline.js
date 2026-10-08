@@ -2,6 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
 const friendsWebhook = require('./friends_webhook');
 const updateFriendRatings = require('./update_friend_ratings');
+const { longFetch } = require('../lib/long_fetch');
 
 const LABEL = 'daily';
 
@@ -30,7 +31,7 @@ const SCRAPE_TIMEOUT_MS = parseInt(process.env.SCRAPE_TIMEOUT_MINUTES || '45', 1
 
 /** POSTs to the express api, failing loudly rather than hanging forever. */
 async function callApi(endpoint, { timeoutMs = SCRAPE_TIMEOUT_MS, body } = {}) {
-    const response = await fetch(`${EXPRESS_URL}${endpoint}`, {
+    const response = await longFetch(`${EXPRESS_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body ?? {}),
