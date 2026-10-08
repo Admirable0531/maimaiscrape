@@ -473,7 +473,14 @@ function runExclusive(name, task) {
 
 app.post(
     '/run-update-user-data',
-    runExclusive('run-update-user-data', async () => ({ success: !!(await updateUserData()) }))
+    runExclusive('run-update-user-data', async () => {
+        const { ok, failedFriends, loginErrors } = await updateUserData();
+        return {
+            success: ok,
+            failedFriends,
+            ...(ok ? {} : { error: loginErrors.join('; ') || 'no attempt succeeded' }),
+        };
+    })
 );
 
 app.post(

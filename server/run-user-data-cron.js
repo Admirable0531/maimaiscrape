@@ -19,8 +19,12 @@ if (cronEnabled) {
     cron.schedule(cronExpr, async () => {
         console.log('[cron] Running scheduled user-data update');
         try {
-            const ok = await updateUserData();
-            console.log('[cron] User-data update finished:', ok ? 'success' : 'no success');
+            const { ok, failedFriends, loginErrors } = await updateUserData();
+            console.log(
+                '[cron] User-data update finished:',
+                ok ? `success, ${failedFriends.length} friend page(s) failed` : 'no success',
+                loginErrors.join('; ')
+            );
         } catch (err) {
             console.error('[cron] User-data update error:', err);
         }

@@ -1,8 +1,16 @@
-const { Client, Collection, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
+const {
+    Client,
+    Collection,
+    EmbedBuilder,
+    Events,
+    GatewayIntentBits,
+    MessageFlags,
+} = require('discord.js');
 const path = require('path');
 const fs = require('node:fs');
 const cron = require('node-cron');
 const config = require('./config');
+const discordLog = require('./lib/discord_log');
 const dailyPipeline = require('./scripts/daily_pipeline');
 const circleRankingScraper = require('./scripts/circle_ranking_scraper');
 const dailyPointsTracker = require('./scripts/daily_points_tracker');
@@ -146,8 +154,11 @@ async function getOptionalChannel(channelId, label) {
  * client.channels, and registering them before login meant a restart near the
  * cron time could fire against an unauthenticated client.
  */
-client.once(Events.ClientReady, (readyClient) => {
+client.once(Events.ClientReady, async (readyClient) => {
     console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+
+    const logChannel = await getOptionalChannel(config.logChannelID, 'log');
+    if (logChannel) discordLog.startMirroring(logChannel);
 
     if (DAILY_PIPELINE_ENABLED) {
         scheduleJob('daily-pipeline', DAILY_PIPELINE_AT, '22:45', async () => {
@@ -171,6 +182,7 @@ client.once(Events.ClientReady, (readyClient) => {
     scheduleJob('circle-rankings', CIRCLE_RUN_AT, '06:30', async () => {
         const result = await circleRankingScraper.run({ sendWebhook: true, saveToMongo: true });
         if (!result.ok) {
+            // console.error is mirrored to the log channel, so this reaches it too.
             console.error('[bot] circle scrape failed:', result.error);
             return;
         }
@@ -187,6 +199,18 @@ client.once(Events.ClientReady, (readyClient) => {
         } else {
             console.log(`[bot] daily points skipped: ${points.error}`);
         }
+        await discordLog.postEmbed(
+            new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle('✅ Circle rankings finished')
+                .setDescription(
+                    `✅ \`circle-scrape\` — ${result.rankingsCount} rankings, webhook ${result.sentWebhook ? 'sent' : 'skipped'}\n` +
+                        (points.ok
+                            ? `✅ \`daily-points\` — ${points.teamsAnalyzed} teams for ${points.date}`
+                            : `➖ \`daily-points\` — skipped: ${points.error}`)
+                )
+                .setFooter({ text: new Date().toLocaleString() })
+        );
     });
 });
 

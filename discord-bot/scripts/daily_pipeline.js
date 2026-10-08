@@ -3,6 +3,7 @@ const config = require('../config');
 const friendsWebhook = require('./friends_webhook');
 const updateFriendRatings = require('./update_friend_ratings');
 const { longFetch } = require('../lib/long_fetch');
+const discordLog = require('../lib/discord_log');
 
 const LABEL = 'daily';
 
@@ -63,8 +64,14 @@ async function postMessages(channel, messages) {
  * Writes ryan_top / friend_<idx>_top / user_info.
  */
 async function scrapeTopScores() {
-    await callApi('/run-update-user-data');
-    return 'top scores scraped';
+    const { failedFriends = [] } = await callApi('/run-update-user-data');
+    if (failedFriends.length === 0) return 'top scores scraped';
+    // The scrape as a whole succeeded, so the step stays green, but friends
+    // whose page never loaded have no new scores tonight and should be named.
+    return (
+        `top scores scraped — ⚠️ ${failedFriends.length} friend page(s) failed to load: ` +
+        failedFriends.join(', ')
+    );
 }
 
 /**
@@ -168,21 +175,22 @@ async function run({ scoreChannel, mainLeaderboardChannel = null, steps: only } 
     const totalSeconds = Math.round((Date.now() - started) / 1000);
     console.log(`[${LABEL}] finished in ${totalSeconds}s — ${failures.length} failure(s)`);
 
-    if (failures.length > 0) {
-        const embed = new EmbedBuilder()
-            .setColor(0xff0000)
-            .setTitle('⚠️ Daily update had problems')
-            .setDescription(
-                results
-                    .map(
-                        (r) => `${r.ok ? '✅' : '❌'} \`${r.name}\` — ${r.detail} _(${r.seconds}s)_`
-                    )
-                    .join('\n')
-            )
-            .setFooter({ text: `Total ${totalSeconds}s • ${new Date().toLocaleString()}` });
-        // The summary always goes to scoreChannel: it's the one destination
-        // guaranteed to exist, and every failure is relevant context there
-        // regardless of which report it was for.
+    const embed = new EmbedBuilder()
+        .setColor(failures.length > 0 ? 0xff0000 : 0x2ecc71)
+        .setTitle(failures.length > 0 ? '⚠️ Daily update had problems' : '✅ Daily update finished')
+        .setDescription(
+            results
+                .map((r) => `${r.ok ? '✅' : '❌'} \`${r.name}\` — ${r.detail} _(${r.seconds}s)_`)
+                .join('\n')
+                .slice(0, 4000)
+        )
+        .setFooter({ text: `Total ${totalSeconds}s • ${new Date().toLocaleString()}` });
+    // Every run's summary goes to the log channel, clean runs included, so a
+    // night with no post there means the pipeline never ran. If the log
+    // channel is unavailable, a failure summary falls back to scoreChannel
+    // rather than being lost.
+    const logged = await discordLog.postEmbed(embed);
+    if (!logged && failures.length > 0) {
         await scoreChannel.send({ embeds: [embed] }).catch((err) => {
             console.error(`[${LABEL}] could not post failure summary:`, err.message);
         });

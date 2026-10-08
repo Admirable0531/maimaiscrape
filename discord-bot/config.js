@@ -58,6 +58,9 @@ module.exports = {
     // FRIEND_WEBHOOK_URL_FY) — it posts via the bot client to this channel id,
     // the same way dailyScoreChannelID does. Empty until set in .env.
     mainLeaderboardChannelID: env('MAIN_LEADERBOARD_CHANNEL_ID', ''),
+    // Ops log: job summaries plus every console.warn/error from the bot
+    // process (see lib/discord_log.js).
+    logChannelID: env('LOG_CHANNEL_ID', '1557778665729691759'),
     // Both derived from server/collectionNames.js's NAME_TO_FRIEND_IDX so a
     // friend added there is immediately resolvable by /constant, instead of
     // needing the same nickname -> friendIdx pair written out in two files.

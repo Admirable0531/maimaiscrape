@@ -109,6 +109,8 @@ async function clickVisibleAgreeCheckbox(page) {
     return false;
 }
 
+const { readSegaError, isAccountRejection } = require('../discord-bot/lib/maimai_session');
+
 async function isErrorPage(page) {
     try {
         const title = (await page.title()) || '';
@@ -339,7 +341,17 @@ async function insertFriendUserInfo(db, formattedDate, friends) {
     }
 }
 
+/**
+ * Scrapes top scores and profiles for the tracked account and every friend.
+ *
+ * Returns { ok, failedFriends, loginErrors } rather than a bare boolean: a run
+ * that logged in but lost six friends' pages used to report plain success,
+ * and a refused login reported only "no success", so neither reached the
+ * daily summary in Discord.
+ */
 async function updateUserData() {
+    const loginErrors = [];
+    let failedFriends = [];
     const login_user = process.env.MAIMAI_USER || '';
     const login_pass = process.env.MAIMAI_PASS || '';
     const user_agent_env = (process.env.USER_AGENT || '').trim();
@@ -381,6 +393,7 @@ async function updateUserData() {
     for (let attemptIdx = 0; attemptIdx < attempts.length; attemptIdx++) {
         const ua = attempts[attemptIdx];
         console.log(`[attempt ${attemptIdx + 1}] using UA: ${ua}`);
+        failedFriends = [];
         // Declared per attempt and closed in `finally`, so a throw can't leak
         // either the browser or the Mongo connection.
         let browser = null;
@@ -437,6 +450,17 @@ async function updateUserData() {
             }
 
             if (await isErrorPage(page)) {
+                const segaError = await readSegaError(page);
+                loginErrors.push(
+                    segaError
+                        ? `SEGA said: "${segaError}"`
+                        : 'SEGA served its ERROR page after login with no message'
+                );
+                if (isAccountRejection(segaError)) {
+                    // Retrying a refused account only adds a failed login.
+                    console.log(`[update] SEGA rejected the login, not retrying: ${segaError}`);
+                    break;
+                }
                 console.log(
                     `[attempt ${attemptIdx + 1}] server returned ERROR page after login; retrying`
                 );
@@ -628,6 +652,7 @@ async function updateUserData() {
                             console.log(
                                 `[update] failed friend_${friendIdx}: no new tab (${e.message})`
                             );
+                            failedFriends.push(tasks[i].name || friendIdx);
                             continue;
                         }
                         await debugScreenshot(newPage, `05_friend_${friendIdx}`);
@@ -637,6 +662,7 @@ async function updateUserData() {
                             console.log(`[update] inserted friend_${friendIdx} top`);
                         } catch (e) {
                             console.log(`[update] failed friend_${friendIdx}:`, e.message);
+                            failedFriends.push(tasks[i].name || friendIdx);
                         } finally {
                             await newPage.close();
                             await delay(300);
@@ -759,8 +785,10 @@ async function updateUserData() {
                 console.log('[update] friend page processing failed:', e);
             }
 
-            console.log('[update] finished successfully');
-            return true;
+            console.log(
+                `[update] finished successfully (${failedFriends.length} friend page(s) failed)`
+            );
+            return { ok: true, failedFriends, loginErrors };
         } catch (e) {
             console.log('[update] Unhandled exception during attempt:', e);
         } finally {
@@ -777,7 +805,7 @@ async function updateUserData() {
         }
     }
     console.log('[update] finished attempts, nothing succeeded');
-    return false;
+    return { ok: false, failedFriends, loginErrors };
 }
 
 if (require.main === module) {

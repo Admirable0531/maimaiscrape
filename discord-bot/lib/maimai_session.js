@@ -115,7 +115,44 @@ async function clickVisibleAgreeCheckbox(page, label) {
     return false;
 }
 
-/** True when SEGA served its generic ERROR/Aime failure page instead of the site. */
+/**
+ * The message SEGA shows on a failed login, or '' if none is on the page.
+ *
+ * SEGA adds #error-ui only when a login fails (a fresh login page has no such
+ * element), and its text is the actual reason — e.g. "The entered SEGA ID is
+ * currently subject to login restrictions. Please log in again after a
+ * while." Nothing used to read it: every failure was reported as the same
+ * guess, "usually a rejected Sega ID/password", and a typo'd Sega ID went
+ * unnoticed for seven months while the nightly retries got it login-
+ * restricted.
+ */
+async function readSegaError(page) {
+    try {
+        return await page.evaluate(() => {
+            const el = document.querySelector('#error-ui');
+            return el ? el.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+        });
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * Failures where trying again only makes things worse: the account itself is
+ * being refused, so a second attempt with another user agent is just one more
+ * failed login for SEGA to count towards (or extend) a restriction.
+ */
+function isAccountRejection(segaError) {
+    return /restrict|incorrect|not (?:be )?(?:found|registered)|invalid|wrong|locked|suspend/i.test(
+        segaError || ''
+    );
+}
+
+/**
+ * When SEGA served its generic ERROR/Aime failure page instead of the site,
+ * returns { segaError } — SEGA's own message, '' if it gave none. Returns null
+ * when the page is not an error page.
+ */
 async function isErrorPage(page, label) {
     try {
         const title = (await page.title()) || '';
@@ -126,21 +163,23 @@ async function isErrorPage(page, label) {
         const hasErrEl = !!(await page.$('#error-ui'));
 
         if (hasErrorTitle || hasAimeError || hasErrEl || hasNoScript) {
+            const segaError = await readSegaError(page);
             console.log(
                 `[${label}][isErrorPage] true`,
                 JSON.stringify({
                     url: page.url(),
                     title,
+                    segaError,
                     hasErrorTitle,
                     hasAimeError,
                     hasErrEl,
                     hasNoScript,
                 })
             );
-            return true;
+            return { segaError };
         }
     } catch {}
-    return false;
+    return null;
 }
 
 /** Fills the Sega ID form and submits it. Used by both the gateway and legacy flows. */
@@ -243,7 +282,7 @@ async function login(page, credentials, label, shot, attempt) {
 /** Raised when every login attempt failed, carrying why each one did. */
 class MaimaiSessionError extends Error {
     constructor(label, reasons) {
-        super(`${label}: all ${reasons.length} login attempt(s) failed — ${reasons.join('; ')}`);
+        super(`${label}: login failed after ${reasons.length} attempt(s) — ${reasons.join('; ')}`);
         this.name = 'MaimaiSessionError';
         this.reasons = reasons;
     }
@@ -300,14 +339,24 @@ async function withMaimaiSession({ credentials, label, task, fallback }) {
 
             await login(page, credentials, label, shot, attempt);
 
-            if (await isErrorPage(page, label)) {
+            const errorPage = await isErrorPage(page, label);
+            if (errorPage) {
                 await shot(page, `06_error_attempt${attempt}`);
+                const { segaError } = errorPage;
+                reasons.push(
+                    `attempt ${attempt} (${ua === ALT_UA ? 'alt UA' : 'primary UA'}): ` +
+                        (segaError
+                            ? `SEGA said: "${segaError}"`
+                            : 'SEGA served its ERROR page after login with no message')
+                );
+                if (isAccountRejection(segaError)) {
+                    console.log(
+                        `[${label}][attempt ${attempt}] SEGA rejected the account itself; not retrying`
+                    );
+                    break;
+                }
                 console.log(
                     `[${label}][attempt ${attempt}] SEGA returned an ERROR page after login; retrying`
-                );
-                reasons.push(
-                    `attempt ${attempt} (${ua === ALT_UA ? 'alt UA' : 'primary UA'}): SEGA served its ERROR page after login ` +
-                        `(usually a rejected Sega ID/password, or the account being signed in elsewhere)`
                 );
                 continue;
             }
@@ -325,7 +374,7 @@ async function withMaimaiSession({ credentials, label, task, fallback }) {
         }
     }
 
-    console.log(`[${label}] all ${userAgents.length} attempts failed: ${reasons.join('; ')}`);
+    console.log(`[${label}] login failed: ${reasons.join('; ')}`);
     if (fallback === undefined) throw new MaimaiSessionError(label, reasons);
     return fallback;
 }
@@ -334,6 +383,8 @@ module.exports = {
     withMaimaiSession,
     MaimaiSessionError,
     isErrorPage,
+    readSegaError,
+    isAccountRejection,
     clickVisibleAgreeCheckbox,
     makeScreenshotter,
     resolveExecutablePath,
