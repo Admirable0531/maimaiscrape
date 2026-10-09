@@ -111,6 +111,22 @@ async function clickVisibleAgreeCheckbox(page) {
 
 const { readSegaError, isAccountRejection } = require('../discord-bot/lib/maimai_session');
 
+/**
+ * A friend's name for reports. The name scraped off the friend list is often
+ * empty, but the mai-tools link carries it as playerName, so fall back to
+ * that before the bare friendIdx.
+ */
+function friendLabel({ name, href, friendIdx }) {
+    if (name) return name;
+    try {
+        const fromLink = new URL(href).searchParams.get('playerName');
+        if (fromLink) return fromLink;
+    } catch {
+        // no usable href
+    }
+    return friendIdx;
+}
+
 async function isErrorPage(page) {
     try {
         const title = (await page.title()) || '';
@@ -146,7 +162,11 @@ const TOP_RECORD_POLL_MS = parseInt(process.env.TOP_RECORD_POLL_MS || '2000', 10
  * deadline is still a backstop, but expiring now says so instead of quietly
  * handing back partial data.
  */
-async function waitForTopRecordPageReady(page) {
+// How long a page may sit with an uncaught script error and no table before
+// it counts as crashed rather than still loading.
+const CRASHED_PAGE_GRACE_MS = 10000;
+
+async function waitForTopRecordPageReady(page, pageErrors = []) {
     const tableSelector = '.topRecordTable.songRecordTable';
     const loadingPattern =
         'Loading\\s+(?:Re:?Master|Basic|Master|Expert|Advanced|recent)\\s+scores';
@@ -169,6 +189,20 @@ async function waitForTopRecordPageReady(page) {
         );
         sawTable = sawTable || table;
         if (table && !loading) return;
+        // mai-tools throws and leaves a blank page when a player has a score on
+        // a chart missing from its song data — seen 2026-10 with OV3RCLOCK
+        // ("Could not find song properties", then "reading 'replace'"). That
+        // page never recovers, so waiting out the full timeout only cost two
+        // minutes per affected friend.
+        if (
+            !table &&
+            pageErrors.length > 0 &&
+            Date.now() - pageErrors.firstAt > CRASHED_PAGE_GRACE_MS
+        ) {
+            throw new Error(
+                `mai-tools crashed before showing scores (${pageErrors[0]}) — usually a chart too new for its song data`
+            );
+        }
         if (loading && loading !== lastLoading) {
             lastLoading = loading;
             console.log('[update] top-record:', loading);
@@ -186,8 +220,8 @@ async function waitForTopRecordPageReady(page) {
     await page.waitForSelector(tableSelector, { timeout: 1000 });
 }
 
-async function getTopScore(page) {
-    await waitForTopRecordPageReady(page);
+async function getTopScore(page, pageErrors) {
+    await waitForTopRecordPageReady(page, pageErrors);
     const data = await page.evaluate(() => {
         // Confirmed live (2026-08): the top-record row no longer has a rank-
         // letter cell at all, and gained a "versionCell" (e.g. "CiRCLE", the
@@ -630,7 +664,7 @@ async function updateUserData() {
                 const page1Friends = await collectPageFriends(page);
                 const page1Tasks = page1Friends
                     .filter((f) => f.friendIdx && f.href)
-                    .map((f) => ({ friendIdx: f.friendIdx }));
+                    .map((f) => ({ friendIdx: f.friendIdx, name: f.name, href: f.href }));
                 await insertFriendUserInfo(db, formattedDate, page1Friends);
                 allTasks.push(...page1Tasks);
 
@@ -639,6 +673,7 @@ async function updateUserData() {
                     const links = await friendListPage.$$('a[target="friendRating"]');
                     for (let i = 0; i < tasks.length; i++) {
                         const { friendIdx } = tasks[i];
+                        const label = friendLabel(tasks[i]);
                         // `links` is index-aligned with `tasks`, so skip in place
                         // rather than filtering the task list.
                         if (skipIdx.has(friendIdx)) continue;
@@ -652,17 +687,26 @@ async function updateUserData() {
                             console.log(
                                 `[update] failed friend_${friendIdx}: no new tab (${e.message})`
                             );
-                            failedFriends.push(tasks[i].name || friendIdx);
+                            failedFriends.push(label);
                             continue;
                         }
+                        const pageErrors = [];
+                        newPage.on('pageerror', (err) => {
+                            if (pageErrors.length === 0) pageErrors.firstAt = Date.now();
+                            pageErrors.push(err.message);
+                        });
                         await debugScreenshot(newPage, `05_friend_${friendIdx}`);
                         try {
-                            const top = await getTopScore(newPage);
+                            const top = await getTopScore(newPage, pageErrors);
                             await db.collection(getTopCollectionName(friendIdx)).insertOne(top);
                             console.log(`[update] inserted friend_${friendIdx} top`);
                         } catch (e) {
                             console.log(`[update] failed friend_${friendIdx}:`, e.message);
-                            failedFriends.push(tasks[i].name || friendIdx);
+                            failedFriends.push(
+                                /mai-tools crashed/.test(e.message)
+                                    ? `${label} (mai-tools crashed)`
+                                    : label
+                            );
                         } finally {
                             await newPage.close();
                             await delay(300);
@@ -750,7 +794,7 @@ async function updateUserData() {
                         const page2Friends = await collectPageFriends(page);
                         const page2Tasks = page2Friends
                             .filter((f) => f.friendIdx && f.href)
-                            .map((f) => ({ friendIdx: f.friendIdx }));
+                            .map((f) => ({ friendIdx: f.friendIdx, name: f.name, href: f.href }));
                         const page1IdSet = new Set(page1IdList);
                         const newOnPage2 = page2Tasks.filter((t) => !page1IdSet.has(t.friendIdx));
                         if (newOnPage2.length === 0) {
