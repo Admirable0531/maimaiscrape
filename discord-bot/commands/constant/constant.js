@@ -14,7 +14,7 @@ const MAIMAI_PASS = process.env.MAIMAI_PASS;
 
 const LOGIN_URL = 'https://maimaidx-eng.com';
 const SCORE_SELECTOR = '.music_master_score_back, .music_remaster_score_back';
-const MAI_TOOLS_SRC = 'https://myjian.github.io/mai-tools/scripts/all-in-one.js';
+const MAI_TOOLS_SRC = config.MAI_TOOLS_SCRIPT_URL;
 
 /** Extra wait before navigating, to look less like a bot. Was a hardcoded 40s. */
 const PRE_NAV_DELAY_MS = parseInt(process.env.CONSTANT_PRE_NAV_DELAY_MS || '5000', 10);

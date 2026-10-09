@@ -110,6 +110,24 @@ async function clickVisibleAgreeCheckbox(page) {
 }
 
 const { readSegaError, isAccountRejection } = require('../discord-bot/lib/maimai_session');
+const { MAI_TOOLS_SCRIPT_URL } = require('../discord-bot/config');
+
+/**
+ * Loads mai-tools into a maimai NET page; its "Analyze Rating" links are
+ * what the scores are read through. MAI_TOOLS_SCRIPT_URL points at the
+ * Admirable0531 fork rather than upstream: upstream's rating calculator
+ * blanks the page for any player with a chart newer than its song data,
+ * which lost those friends' scores every night until the fork patched it.
+ */
+async function injectMaiTools(page) {
+    await page.evaluate((src) => {
+        if (['https://maimaidx.jp', 'https://maimaidx-eng.com'].indexOf(location.origin) >= 0) {
+            const s = document.createElement('script');
+            s.src = src + '?t=' + Math.floor(Date.now() / 60000);
+            document.body.appendChild(s);
+        }
+    }, MAI_TOOLS_SCRIPT_URL);
+}
 
 /**
  * A friend's name for reports. The name scraped off the friend list is often
@@ -503,19 +521,7 @@ async function updateUserData() {
 
             // inject helper script (best-effort)
             try {
-                await page.evaluate(() => {
-                    if (
-                        ['https://maimaidx.jp', 'https://maimaidx-eng.com'].indexOf(
-                            location.origin
-                        ) >= 0
-                    ) {
-                        const s = document.createElement('script');
-                        s.src =
-                            'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' +
-                            Math.floor(Date.now() / 60000);
-                        document.body.appendChild(s);
-                    }
-                });
+                await injectMaiTools(page);
             } catch (e) {}
 
             // Mongo setup
@@ -605,19 +611,7 @@ async function updateUserData() {
                     waitUntil: 'networkidle2',
                 });
                 try {
-                    await page.evaluate(() => {
-                        if (
-                            ['https://maimaidx.jp', 'https://maimaidx-eng.com'].indexOf(
-                                location.origin
-                            ) >= 0
-                        ) {
-                            const s = document.createElement('script');
-                            s.src =
-                                'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' +
-                                Math.floor(Date.now() / 60000);
-                            document.body.appendChild(s);
-                        }
-                    });
+                    await injectMaiTools(page);
                 } catch (e) {}
                 await page.waitForSelector('a[target="friendRating"]', { timeout: 10000 });
                 await delay(2500); // let mai-tools script run before we click Analyze Rating
@@ -776,19 +770,7 @@ async function updateUserData() {
                         }
                         await delay(800);
                         try {
-                            await page.evaluate(() => {
-                                if (
-                                    ['https://maimaidx.jp', 'https://maimaidx-eng.com'].indexOf(
-                                        location.origin
-                                    ) >= 0
-                                ) {
-                                    const s = document.createElement('script');
-                                    s.src =
-                                        'https://myjian.github.io/mai-tools/scripts/all-in-one.js?t=' +
-                                        Math.floor(Date.now() / 60000);
-                                    document.body.appendChild(s);
-                                }
-                            });
+                            await injectMaiTools(page);
                         } catch (e) {}
                         await delay(2500);
                         const page2Friends = await collectPageFriends(page);

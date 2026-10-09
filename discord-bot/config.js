@@ -61,6 +61,13 @@ module.exports = {
     // Ops log: job summaries plus every console.warn/error from the bot
     // process (see lib/discord_log.js).
     logChannelID: env('LOG_CHANNEL_ID', '1557778665729691759'),
+    // mai-tools' maimai NET script. The Admirable0531 fork, which syncs with
+    // upstream daily, rather than upstream itself: upstream's rating
+    // calculator crashes on charts newer than its song data.
+    MAI_TOOLS_SCRIPT_URL: env(
+        'MAI_TOOLS_SCRIPT_URL',
+        'https://admirable0531.github.io/mai-tools/scripts/all-in-one.js'
+    ),
     // Both derived from server/collectionNames.js's NAME_TO_FRIEND_IDX so a
     // friend added there is immediately resolvable by /constant, instead of
     // needing the same nickname -> friendIdx pair written out in two files.
