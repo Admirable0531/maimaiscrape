@@ -326,6 +326,89 @@ app.get('/api/circle-rankings', async (req, res) => {
     }
 });
 
+// One circle's points day by day, from the nightly circle_rankings snapshots.
+// Points are cumulative over the season, so each day's gain is the difference
+// from the previous snapshot. Only the top 100 circles are stored per night: a
+// day the circle was outside it has no entry, and the next gain spans the gap.
+const normalizeCircleName = (name) =>
+    String(name || '')
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+
+app.get('/api/circle-rankings/history', async (req, res) => {
+    try {
+        const wanted = normalizeCircleName(req.query.circle);
+        if (!wanted) {
+            return res.status(400).json({ success: false, error: 'missing circle parameter' });
+        }
+        const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 365);
+        const db = await getDatabase();
+        const snapshots = await db
+            .collection('circle_rankings')
+            .find({ scrapedAt: { $gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) } })
+            .sort({ scrapedAt: 1 })
+            .toArray();
+        if (snapshots.length === 0) {
+            return res.status(404).json({ success: false, error: 'No circle rankings found' });
+        }
+
+        // Resolve the name against every circle seen in the window: exact first, then a unique partial match.
+        const names = new Set(snapshots.flatMap((s) => (s.rankings || []).map((r) => r.groupName)));
+        const all = [...names];
+        const exact = all.filter((n) => normalizeCircleName(n) === wanted);
+        const partial = all.filter((n) => normalizeCircleName(n).includes(wanted));
+        const matches = exact.length > 0 ? exact : partial;
+        if (matches.length === 0) {
+            return res
+                .status(404)
+                .json({
+                    success: false,
+                    error: `No circle matching "${req.query.circle}" in the stored top 100.`,
+                });
+        }
+        if (matches.length > 1) {
+            return res.json({
+                success: false,
+                error: 'Several circles match',
+                matches: matches.slice(0, 15),
+            });
+        }
+        const name = matches[0];
+
+        let previous = null;
+        const history = [];
+        for (const snapshot of snapshots) {
+            const ranked = sortRankings(snapshot.rankings || []);
+            const index = ranked.findIndex((r) => r.groupName === name);
+            if (index < 0) {
+                history.push({
+                    date: snapshot.snapshotDate || null,
+                    scrapedAt: snapshot.scrapedAt,
+                    rank: null,
+                    points: null,
+                    gain: null,
+                });
+                continue;
+            }
+            const points = ranked[index].points;
+            history.push({
+                date: snapshot.snapshotDate || null,
+                scrapedAt: snapshot.scrapedAt,
+                rank: index + 1,
+                points,
+                gain: previous === null ? null : points - previous,
+            });
+            previous = points;
+        }
+        res.json({ success: true, circle: name, days: history });
+    } catch (err) {
+        console.error('[server] /api/circle-rankings/history error:', err);
+        res.status(500).json({ success: false, error: String(err) });
+    }
+});
+
 // Cache for SEGA maimai songs JSON
 let segaSongsCache = null;
 let segaSongsCacheTime = 0;
